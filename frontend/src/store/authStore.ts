@@ -89,3 +89,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, token: null, isGuest: false })
   },
 }))
+
+// 开发调试用
+if (typeof window !== 'undefined') {
+  ;(window as any).__authStore = useAuthStore
+}

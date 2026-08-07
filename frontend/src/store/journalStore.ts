@@ -522,3 +522,8 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       ?.chapters.find((c) => c.id === chapterId)
       ?.entries.find((e) => e.id === entryId),
 }))
+
+// 开发调试用：把 store 挂到 window，方便浏览器控制台直接调用 store 方法做验证
+if (typeof window !== 'undefined') {
+  ;(window as any).__journalStore = useJournalStore
+}
