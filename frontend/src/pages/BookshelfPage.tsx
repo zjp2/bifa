@@ -73,10 +73,10 @@ export default function BookshelfPage() {
   const onOpen = (b: Journal) => {
     if (openingBookId) return // 防止动画期间重复点击
     setOpeningBookId(b.id)
-    // 等待书翻开动画结束后再导航
+    // 等待封面翻开动画（0.65s）结束后再导航进入书内页
     window.setTimeout(() => {
       navigate(`/journal/${b.id}`)
-    }, 720)
+    }, 620)
   }
 
   const totalCount = useMemo(

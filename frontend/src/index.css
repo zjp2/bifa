@@ -268,32 +268,28 @@ textarea {
 }
 
 /* —— 书翻开 3D 动画 ——
-   点击书卡时触发：以左边（书脊）为轴 rotateY 翻过去，
-   同时放大、提亮、淡出，营造"翻开书页"的物理感 */
+   只翻开"封面"：以左边（书脊）为轴 rotateY 从合上(0°)翻到打开(约-105°)，
+   翻到接近垂直时整体淡出，营造"封面打开 → 进入书内页"的过渡感。
+   不会翻到 -180°（那像把整本书翻面）。 */
 @keyframes bookOpen {
   0% {
     transform: rotateY(0deg) scale(1);
     opacity: 1;
     filter: brightness(1);
   }
-  40% {
-    transform: rotateY(-75deg) scale(1.06);
-    opacity: 0.96;
-    filter: brightness(1.08);
-  }
-  70% {
-    transform: rotateY(-140deg) scale(1.12);
-    opacity: 0.7;
-    filter: brightness(1.1);
+  55% {
+    transform: rotateY(-100deg) scale(1.04);
+    opacity: 1;
+    filter: brightness(1.12);
   }
   100% {
-    transform: rotateY(-180deg) scale(1.18);
+    transform: rotateY(-108deg) scale(1.06);
     opacity: 0;
-    filter: brightness(1.15);
+    filter: brightness(1.18);
   }
 }
 .book-opening {
-  animation: bookOpen 0.75s cubic-bezier(0.65, 0, 0.85, 0.2) forwards;
+  animation: bookOpen 0.65s cubic-bezier(0.5, 0.05, 0.55, 0.95) forwards;
   transform-origin: left center;
   z-index: 50;
 }
