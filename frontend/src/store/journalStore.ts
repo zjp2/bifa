@@ -23,9 +23,9 @@ interface JournalState {
   persist: () => void
 
   /** 新建日记本 */
-  createJournal: (input: { name: string; description?: string; color?: string }) => Promise<Journal>
+  createJournal: (input: { name: string; description?: string; color?: string; coverImage?: string | null }) => Promise<Journal>
   /** 更新日记本 */
-  updateJournal: (id: string, patch: Partial<Pick<Journal, 'name' | 'description' | 'color'>>) => Promise<void>
+  updateJournal: (id: string, patch: Partial<Pick<Journal, 'name' | 'description' | 'color' | 'coverImage'>>) => Promise<void>
   /** 删除日记本 */
   deleteJournal: (id: string) => Promise<void>
 
@@ -211,6 +211,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         desc: input.description ?? '',
         description: input.description ?? '',
         color: input.color ?? '#8a2f1f',
+        coverImage: input.coverImage ?? null,
         chapters: [],
       }
       set((s) => ({ journals: [...s.journals, journal] }))
@@ -221,6 +222,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       name: input.name,
       description: input.description,
       color: input.color,
+      coverImage: input.coverImage,
     })
     const j = normalizeJournal(created)
     set((s) => ({ journals: [...s.journals, j] }))
@@ -237,6 +239,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
               desc: patch.description ?? j.desc,
               description: patch.description ?? j.description,
               color: patch.color ?? j.color,
+              coverImage: patch.coverImage !== undefined ? patch.coverImage : j.coverImage,
             }
           : j,
       ),
@@ -247,6 +250,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         name: patch.name,
         description: patch.description,
         color: patch.color,
+        coverImage: patch.coverImage,
       }).catch((e) => console.warn('[journalStore] 更新日记本失败：', e))
     }
   },

@@ -20,6 +20,7 @@ export default function BookshelfPage() {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [color, setColor] = useState(BOOK_COLORS[0].value)
+  const [coverImage, setCoverImage] = useState<string | null>(null)
 
   // 进入时确保数据已加载
   useEffect(() => {
@@ -30,7 +31,22 @@ export default function BookshelfPage() {
     setName('')
     setDesc('')
     setColor(BOOK_COLORS[0].value)
+    setCoverImage(null)
     setModalOpen(true)
+  }
+
+  // 选取图片 → 转 base64
+  const onPickCover = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 3 * 1024 * 1024) {
+      toast('图片不宜超过 3MB')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setCoverImage(reader.result as string)
+    reader.readAsDataURL(file)
+    e.target.value = ''
   }
 
   const confirmCreate = async () => {
@@ -38,7 +54,7 @@ export default function BookshelfPage() {
       toast('请为日记本命名')
       return
     }
-    const j = await createJournal({ name: name.trim(), description: desc.trim(), color })
+    const j = await createJournal({ name: name.trim(), description: desc.trim(), color, coverImage })
     setModalOpen(false)
     toast(`已立卷《${j.name}》`)
     navigate(`/journal/${j.id}`)
@@ -171,7 +187,17 @@ export default function BookshelfPage() {
                     >
                       {b.name}
                     </h3>
-                    <p className="mt-2 flex-1 text-center font-latin text-[13px] italic leading-relaxed text-[rgba(243,234,215,0.75)]">
+                    {/* 封面图：嵌入中央区域，保留封面色边框 */}
+                    {b.coverImage && (
+                      <div className="mx-auto mt-2.5 w-[78%] overflow-hidden rounded-[2px] border border-white/25 shadow-[0_2px_8px_rgba(0,0,0,0.35)]" style={{ aspectRatio: '4 / 3' }}>
+                        <img
+                          src={b.coverImage}
+                          alt={b.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <p className={`text-center font-latin text-[13px] italic leading-relaxed text-[rgba(243,234,215,0.75)] ${b.coverImage ? 'mt-2' : 'mt-2 flex-1'}`}>
                       {b.desc || b.description || ''}
                     </p>
                     <div className="mt-auto flex justify-between border-t border-white/15 pt-2.5 font-latin text-[11px] italic tracking-wide text-[rgba(243,234,215,0.7)]">
@@ -234,6 +260,44 @@ export default function BookshelfPage() {
                 }}
               />
             ))}
+          </div>
+        </div>
+        {/* 封面图上传 */}
+        <div className="mb-2">
+          <label className="modal-label">封面图（可选）</label>
+          <div className="mt-1.5 flex items-center gap-3">
+            {/* 预览框 */}
+            <div
+              className="relative flex h-[60px] w-[80px] shrink-0 items-center justify-center overflow-hidden rounded-[3px] border-2"
+              style={{
+                background: `linear-gradient(135deg, ${color} 0%, rgba(0,0,0,0.4) 100%)`,
+                borderColor: 'var(--margin-line)',
+              }}
+            >
+              {coverImage ? (
+                <img src={coverImage} alt="封面预览" className="h-full w-full object-cover" />
+              ) : (
+                <span className="font-latin text-[10px] italic text-[rgba(243,234,215,0.6)]">空</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="btn-ghost cursor-pointer text-[13px]">
+                选取图像
+                <input type="file" accept="image/*" onChange={onPickCover} className="hidden" />
+              </label>
+              {coverImage && (
+                <button
+                  type="button"
+                  onClick={() => setCoverImage(null)}
+                  className="text-[12px] text-ink-faded underline-offset-2 hover:text-accent hover:underline"
+                >
+                  移除
+                </button>
+              )}
+              <span className="font-serif text-[11px] leading-tight text-ink-faded">
+                图片将嵌于封面中央，保留封面色边框
+              </span>
+            </div>
           </div>
         </div>
         <div className="mt-6 flex justify-end gap-2.5">

@@ -26,6 +26,7 @@ model Journal {
   name        String
   description String?
   color       String    @default("#8a2f1f")
+  coverImage  String?   @map("cover_image")
   sortOrder   Int       @default(0) @map("sort_order")
   createdAt   DateTime  @default(now()) @map("created_at")
   owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)

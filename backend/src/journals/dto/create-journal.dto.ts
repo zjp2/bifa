@@ -14,4 +14,8 @@ export class CreateJournalDto {
   @IsString()
   @MaxLength(20)
   color?: string;
+
+  @IsOptional()
+  @IsString()
+  coverImage?: string;
 }

@@ -42,6 +42,7 @@ export interface Journal {
   description?: string
   desc?: string // 兼容原型字段
   color: string
+  coverImage?: string | null
   chapters: Chapter[]
   sortOrder?: number
 }
@@ -51,6 +52,7 @@ export interface CreateJournalInput {
   name: string
   description?: string
   color?: string
+  coverImage?: string | null
 }
 
 /** 创建章节入参 */
