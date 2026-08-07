@@ -76,10 +76,10 @@ export default function BookshelfPage() {
     if (openingBook) return // 防止动画期间重复点击
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setOpeningBook({ journal: b, rect })
-    // 推近 0.45s + 停顿 0.08s + 翻开 0.65s ≈ 1.18s，在翻开接近完成时导航
+    // 推近 0.45s + 停顿 0.08s + 翻开 0.75s ≈ 1.28s，在翻开快结束时导航
     window.setTimeout(() => {
       navigate(`/journal/${b.id}`)
-    }, 1100)
+    }, 1220)
   }
 
   const totalCount = useMemo(
