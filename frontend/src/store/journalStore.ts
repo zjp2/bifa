@@ -62,6 +62,61 @@ const isGuest = () => useAuthStore.getState().isGuest
 const toIsoDate = (d: number | string | undefined): string | undefined =>
   d === undefined ? undefined : typeof d === 'number' ? new Date(d).toISOString() : d
 
+/**
+ * 已标记为"正在删除/已删除"的 entry / chapter / journal id 集合。
+ * 用于在 updateEntry 中短路，避免对已被移除的实体继续做乐观更新 + API 调用，
+ * 这是删除书籍期间浏览器崩溃的主要原因（死循环/JS 堆溢出）。
+ */
+const _purgatory: {
+  entryIds: Set<string>
+  chapterIds: Set<string>
+  journalIds: Set<string>
+  /** 把某个 journal 下的所有 chapter / entry id 全部登记进炼狱 */
+  markJournal: (journals: Journal[], journalId: string) => void
+  markChapter: (journals: Journal[], chapterId: string) => void
+  markEntry: (entryId: string) => void
+  hasEntry: (entryId: string) => boolean
+  hasJournal: (journalId: string) => boolean
+  clear: () => void
+} = {
+  entryIds: new Set(),
+  chapterIds: new Set(),
+  journalIds: new Set(),
+  markJournal(journals, journalId) {
+    this.journalIds.add(journalId)
+    const j = journals.find((x) => x.id === journalId)
+    if (!j) return
+    for (const c of j.chapters) {
+      this.chapterIds.add(c.id)
+      for (const e of c.entries) this.entryIds.add(e.id)
+    }
+  },
+  markChapter(journals, chapterId) {
+    this.chapterIds.add(chapterId)
+    for (const j of journals) {
+      const c = j.chapters.find((x) => x.id === chapterId)
+      if (c) {
+        for (const e of c.entries) this.entryIds.add(e.id)
+        return
+      }
+    }
+  },
+  markEntry(entryId) {
+    this.entryIds.add(entryId)
+  },
+  hasEntry(entryId) {
+    return this.entryIds.has(entryId)
+  },
+  hasJournal(journalId) {
+    return this.journalIds.has(journalId)
+  },
+  clear() {
+    this.entryIds.clear()
+    this.chapterIds.clear()
+    this.journalIds.clear()
+  },
+}
+
 /** 访客模式：示例数据 */
 function seedSample(): Journal[] {
   const now = Date.now()
@@ -260,11 +315,21 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   deleteJournal: async (id) => {
-    set((s) => ({ journals: s.journals.filter((j) => j.id !== id) }))
+    // 先登记炼狱：在 journals 还未过滤前，把该 journal 下所有 chapter/entry 记为"正在删除"
+    // 这样期间任何 updateEntry 都能快速短路，避免死循环/堆溢出
+    _purgatory.markJournal(get().journals, id)
+    set((s) => ({
+      journals: s.journals.filter((j) => j.id !== id),
+      collapsedChapters: Object.fromEntries(
+        Object.entries(s.collapsedChapters).filter(([cid]) => !_purgatory.chapterIds.has(cid)),
+      ),
+    }))
     get().persist()
     if (!isGuest()) {
       await journalApi.remove(id).catch((e) => console.warn('[journalStore] 删除日记本失败：', e))
     }
+    // 后端处理完毕后从炼狱除名（已删除，集合不再需要持有）
+    _purgatory.journalIds.delete(id)
   },
 
   createChapter: async (journalId, name) => {
@@ -307,16 +372,21 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   deleteChapter: async (id) => {
+    _purgatory.markChapter(get().journals, id)
     set((s) => ({
       journals: s.journals.map((j) => ({
         ...j,
         chapters: j.chapters.filter((c) => c.id !== id),
       })),
+      collapsedChapters: Object.fromEntries(
+        Object.entries(s.collapsedChapters).filter(([cid]) => cid !== id),
+      ),
     }))
     get().persist()
     if (!isGuest()) {
       await chapterApi.remove(id).catch((e) => console.warn('[journalStore] 删除章节失败：', e))
     }
+    _purgatory.chapterIds.delete(id)
   },
 
   createEntry: async (journalId, chapterId, partial) => {
@@ -379,6 +449,22 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   updateEntry: async (id, patch) => {
+    // 短路 1：该 entry 所属 journal/chapter 正在被删除 → 立即跳过，避免死循环
+    if (_purgatory.hasEntry(id)) return
+    const state = get()
+    // 短路 2：该 entry 已不存在于 journals 树中（journal 已被删但炼狱未登记）→ 跳过
+    let found = false
+    for (const j of state.journals) {
+      for (const c of j.chapters) {
+        if (c.entries.some((e) => e.id === id)) {
+          found = true
+          break
+        }
+      }
+      if (found) break
+    }
+    if (!found) return
+
     set((s) => ({
       journals: s.journals.map((j) => ({
         ...j,
@@ -403,6 +489,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   deleteEntry: async (id) => {
+    _purgatory.markEntry(id)
     set((s) => ({
       journals: s.journals.map((j) => ({
         ...j,
@@ -416,6 +503,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     if (!isGuest()) {
       await entryApi.remove(id).catch((e) => console.warn('[journalStore] 删除条目失败：', e))
     }
+    _purgatory.entryIds.delete(id)
   },
 
   toggleChapter: (id) => {

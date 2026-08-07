@@ -34,6 +34,7 @@ export class JournalsService {
         name: dto.name,
         description: dto.description,
         color: dto.color,
+        coverImage: dto.coverImage,
       },
     });
   }
@@ -46,6 +47,7 @@ export class JournalsService {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.color !== undefined && { color: dto.color }),
+        ...(dto.coverImage !== undefined && { coverImage: dto.coverImage }),
       },
     });
   }

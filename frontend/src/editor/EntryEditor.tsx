@@ -28,6 +28,16 @@ function escapeCodeHtml(s: string): string {
 export default function EntryEditor({ entry, chapter }: Props) {
   const toast = useUIStore((s) => s.toast)
   const updateEntry = useJournalStore((s) => s.updateEntry)
+  const journals = useJournalStore((s) => s.journals)
+  /** 检查当前 entry 所属 journal 是否还在 store 里（已删除则跳过一切保存行为） */
+  const entryStillAlive = useCallback(() => {
+    for (const j of journals) {
+      for (const c of j.chapters) {
+        if (c.entries.some((e) => e.id === entry.id)) return true
+      }
+    }
+    return false
+  }, [journals, entry.id])
 
   const [title, setTitle] = useState(entry.title)
   const [subtitle, setSubtitle] = useState(entry.subtitle ?? '')
@@ -119,6 +129,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
 
   const flushSave = useCallback(
     (silent = true) => {
+      if (!entryStillAlive()) return
       if (!dirtyRef.current) {
         if (!silent) toast('已是最新')
         return
@@ -138,7 +149,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
       dirtyRef.current = false
       if (!silent) toast('已存稿')
     },
-    [entry.id, entry.content, updateEntry, toast],
+    [entry.id, entry.content, updateEntry, toast, entryStillAlive],
   )
 
   const scheduleSave = useCallback(
@@ -155,19 +166,33 @@ export default function EntryEditor({ entry, chapter }: Props) {
     scheduleRef.current = scheduleSave
   }, [scheduleSave])
 
-  // 卸载时落盘
+  // 卸载时落盘（只有 entry 仍然存在才执行，防止删除书籍期间对已移除实体写回导致崩溃）
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       if (dirtyRef.current) {
-        const f = fieldsRef.current
-        void updateEntry(entry.id, {
-          title: f.title,
-          subtitle: f.subtitle,
-          date: f.date,
-          tags: f.tags,
-          content: editorRef.current?.getHTML() ?? entry.content,
-        })
+        // 卸载前做一次 alive 检查：如果 entry 已不在 store（所属 journal/chapter 已被删），直接跳过
+        const latest = useJournalStore.getState().journals
+        let alive = false
+        for (const j of latest) {
+          for (const c of j.chapters) {
+            if (c.entries.some((e) => e.id === entry.id)) {
+              alive = true
+              break
+            }
+          }
+          if (alive) break
+        }
+        if (alive) {
+          const f = fieldsRef.current
+          void updateEntry(entry.id, {
+            title: f.title,
+            subtitle: f.subtitle,
+            date: f.date,
+            tags: f.tags,
+            content: editorRef.current?.getHTML() ?? entry.content,
+          })
+        }
         dirtyRef.current = false
       }
     }
@@ -192,6 +217,14 @@ export default function EntryEditor({ entry, chapter }: Props) {
       return
     }
     const sync = () => {
+      // 安全门：entry 所属 journal 已被删 → 停掉 interval，避免无效渲染 + 内存增长
+      if (!entryStillAlive()) {
+        clearInterval(t)
+        window.removeEventListener('scroll', sync, true)
+        window.removeEventListener('resize', sync)
+        setImgWrapperStyle(null)
+        return
+      }
       const el = editor?.view.dom as HTMLElement | undefined
       if (!el) return
       const imgRect = selectedImg.getBoundingClientRect()
@@ -214,7 +247,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
       window.removeEventListener('scroll', sync, true)
       window.removeEventListener('resize', sync)
     }
-  }, [selectedImg, editor])
+  }, [selectedImg, editor, entryStillAlive])
 
   // 选中图片时在 Tiptap 中定位对应节点（以便 setImageWidth 更新）
   const setWidthForSelectedImg = useCallback(
