@@ -5,6 +5,8 @@ import { useJournalStore } from '@/store/journalStore'
 import { useUIStore } from '@/store/uiStore'
 import Modal from '@/components/Modal'
 import ProfileModal from '@/components/ProfileModal'
+import BookCover from '@/components/BookCover'
+import OpeningBookOverlay from '@/components/OpeningBookOverlay'
 import { BOOK_COLORS, type Journal } from '@/types'
 import { initialsOf } from '@/utils'
 
@@ -18,7 +20,7 @@ export default function BookshelfPage() {
 
   const [modalOpen, setModalOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [openingBookId, setOpeningBookId] = useState<string | null>(null)
+  const [openingBook, setOpeningBook] = useState<{ journal: Journal; rect: DOMRect } | null>(null)
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [color, setColor] = useState(BOOK_COLORS[0].value)
@@ -70,13 +72,14 @@ export default function BookshelfPage() {
     }
   }
 
-  const onOpen = (b: Journal) => {
-    if (openingBookId) return // 防止动画期间重复点击
-    setOpeningBookId(b.id)
-    // 等待封面翻开动画（0.65s）结束后再导航进入书内页
+  const onOpen = (b: Journal, e: React.MouseEvent) => {
+    if (openingBook) return // 防止动画期间重复点击
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setOpeningBook({ journal: b, rect })
+    // 推近 0.45s + 停顿 0.08s + 翻开 0.65s ≈ 1.18s，在翻开接近完成时导航
     window.setTimeout(() => {
       navigate(`/journal/${b.id}`)
-    }, 620)
+    }, 1100)
   }
 
   const totalCount = useMemo(
@@ -146,13 +149,12 @@ export default function BookshelfPage() {
           </div>
         ) : (
           journals.map((b, idx) => {
-            const entryCount = b.chapters.reduce((s, c) => s + c.entries.length, 0)
-            const isOpening = openingBookId === b.id
+            const isHidden = openingBook?.journal.id === b.id
             return (
               <div
                 key={b.id}
-                onClick={() => onOpen(b)}
-                className={`group relative cursor-pointer animate-bookIn ${isOpening ? 'book-opening' : ''}`}
+                onClick={(e) => onOpen(b, e)}
+                className={`group relative cursor-pointer animate-bookIn ${isHidden ? 'opacity-0' : ''}`}
                 style={{ perspective: '1000px', animationDelay: `${idx * 0.08}s` }}
               >
                 <button
@@ -163,46 +165,10 @@ export default function BookshelfPage() {
                   ×
                 </button>
                 <div
-                  className={`relative h-[300px] transition-transform duration-500 ease-out group-hover:-translate-y-2 group-hover:[transform:rotateY(-8deg)] ${isOpening ? '!transform-none !transition-none' : ''}`}
+                  className="relative h-[300px] transition-transform duration-500 ease-out group-hover:-translate-y-2 group-hover:[transform:rotateY(-8deg)]"
                   style={{ transformStyle: 'preserve-3d' }}
                 >
-                  <div
-                    className="relative flex h-full flex-col overflow-hidden rounded-r-[6px] rounded-l-[2px] p-5 pl-7 text-paper"
-                    style={{
-                      background: `linear-gradient(135deg, ${b.color} 0%, rgba(0,0,0,0.5) 100%)`,
-                      boxShadow:
-                        'inset 4px 0 0 rgba(255,255,255,0.1), inset -2px 0 8px rgba(0,0,0,0.4), 4px 6px 16px rgba(0,0,0,0.3), 8px 10px 24px rgba(0,0,0,0.15)',
-                    }}
-                  >
-                    {/* 装订线 */}
-                    <div className="absolute left-2.5 top-0 bottom-0 w-px bg-white/20" />
-                    {/* 内描边 */}
-                    <div className="pointer-events-none absolute inset-2 left-4 rounded-[2px] border border-white/15" />
-                    <div className="mb-1.5 text-center font-latin text-[24px] text-white/40">❦</div>
-                    <h3
-                      className="text-center font-brush text-[28px] font-semibold leading-tight text-paper"
-                      style={{ letterSpacing: '2px', textShadow: '0 2px 4px rgba(0,0,0,0.4)' }}
-                    >
-                      {b.name}
-                    </h3>
-                    {/* 封面图：嵌入中央区域，保留封面色边框 */}
-                    {b.coverImage && (
-                      <div className="mx-auto mt-2.5 w-[78%] overflow-hidden rounded-[2px] border border-white/25 shadow-[0_2px_8px_rgba(0,0,0,0.35)]" style={{ aspectRatio: '4 / 3' }}>
-                        <img
-                          src={b.coverImage}
-                          alt={b.name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    )}
-                    <p className={`text-center font-latin text-[13px] italic leading-relaxed text-[rgba(243,234,215,0.75)] ${b.coverImage ? 'mt-2' : 'mt-2 flex-1'}`}>
-                      {b.desc || b.description || ''}
-                    </p>
-                    <div className="mt-auto flex justify-between border-t border-white/15 pt-2.5 font-latin text-[11px] italic tracking-wide text-[rgba(243,234,215,0.7)]">
-                      <span>{b.chapters.length} 章</span>
-                      <span>{entryCount} 则</span>
-                    </div>
-                  </div>
+                  <BookCover journal={b} />
                 </div>
               </div>
             )
@@ -310,6 +276,11 @@ export default function BookshelfPage() {
 
       {/* 个人信息弹层 */}
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+
+      {/* 书翻开浮层：镜头推近 + 翻开封面 */}
+      {openingBook && (
+        <OpeningBookOverlay journal={openingBook.journal} startRect={openingBook.rect} />
+      )}
     </div>
   )
 }
