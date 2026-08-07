@@ -439,7 +439,7 @@
 
   .shelf-toolbar{
     display:flex;align-items:center;justify-content:space-between;
-    max-width:1100px;margin:0 auto;padding:0 40px 24px;
+    max-width:1200px;margin:0 auto;padding:0 40px 24px;
   }
   .shelf-title{
     font-family:"Cormorant Garamond",serif;font-size:24px;font-weight:600;color:var(--ink);
@@ -458,8 +458,8 @@
   .new-book-btn .plus{font-family:"Cormorant Garamond",serif;font-size:18px;line-height:0}
 
   .books-grid{
-    display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
-    gap:40px 36px;max-width:1100px;margin:0 auto;padding:20px 40px 80px;
+    display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+    gap:44px 40px;max-width:1200px;margin:0 auto;padding:20px 40px 80px;
   }
   .book-card{cursor:pointer;perspective:1000px;position:relative;animation:bookIn 0.5s ease backwards}
   @keyframes bookIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
@@ -497,7 +497,7 @@
   /* ===========================================
      VIEW 2: BOOK (书内编辑)
      =========================================== */
-  .book-view{display:grid;grid-template-columns:300px 1fr;height:100vh;height:100dvh}
+  .book-view{display:grid;grid-template-columns:320px 1fr;height:100vh;height:100dvh}
   .tree-panel{
     background:linear-gradient(180deg, var(--shelf) 0%, var(--shelf-deep) 100%);
     color:var(--paper);display:flex;flex-direction:column;
@@ -592,7 +592,7 @@
   .editor-wrap{height:100%;overflow-y:auto}
   .editor-wrap::-webkit-scrollbar{width:10px}
   .editor-wrap::-webkit-scrollbar-thumb{background:var(--margin-line);border-radius:5px}
-  .editor{max-width:720px;margin:0 auto;padding:70px 70px 120px;position:relative}
+  .editor{max-width:860px;margin:0 auto;padding:70px 80px 120px;position:relative}
   .chapter-tag{
     display:inline-block;font-family:"Cormorant Garamond",serif;font-style:italic;font-size:12px;
     color:var(--accent);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;
@@ -800,18 +800,48 @@
   @keyframes appIn{from{opacity:0}to{opacity:1}}
 
   /* ========== RESPONSIVE ========== */
-  @media (max-width: 900px){
-    .book-view{grid-template-columns:240px 1fr}
-    .editor{padding:60px 40px 100px}
-    .editor-title{font-size:30px}
-    .editor-content{font-size:16px}
+
+  /* 超大屏：>1600px，进一步扩展内容区 */
+  @media (min-width: 1600px){
+    .book-view{grid-template-columns:340px 1fr}
+    .editor{max-width:960px;padding:80px 100px 140px}
+    .editor-title{font-size:42px}
+    .editor-content{font-size:18px;line-height:2.1}
+    .books-grid{max-width:1300px;gap:48px 44px}
+    .shelf-toolbar{max-width:1300px}
   }
+
+  /* 大屏：1200-1600px */
+  @media (min-width: 1200px) and (max-width: 1599px){
+    .book-view{grid-template-columns:320px 1fr}
+    .editor{max-width:900px;padding:70px 90px 130px}
+    .books-grid{max-width:1180px}
+    .shelf-toolbar{max-width:1180px}
+  }
+
+  /* 中等屏：901-1199px（默认PC设置已覆盖，这里微调）*/
+  @media (min-width: 901px) and (max-width: 1199px){
+    .book-view{grid-template-columns:300px 1fr}
+    .editor{max-width:780px;padding:65px 60px 120px}
+  }
+
+  /* 平板：769-900px */
+  @media (max-width: 900px){
+    .book-view{grid-template-columns:260px 1fr}
+    .editor{max-width:680px;padding:56px 40px 100px}
+    .editor-title{font-size:32px}
+    .editor-content{font-size:16px}
+    .shelf-toolbar{max-width:100%;padding:0 28px 20px}
+    .books-grid{max-width:100%;gap:32px 28px;padding:16px 28px 60px}
+  }
+
+  /* 移动端：≤768px */
   @media (max-width: 768px){
     .brand-big{font-size:48px;letter-spacing:4px}
     .brand-en{font-size:13px;letter-spacing:4px}
     .shelf-header{padding:30px 16px 16px}
-    .shelf-toolbar{padding:0 16px 16px}
-    .books-grid{grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:20px 16px;padding:12px 16px calc(40px + env(safe-area-inset-bottom))}
+    .shelf-toolbar{padding:0 16px 16px;max-width:100%}
+    .books-grid{grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:20px 16px;padding:12px 16px calc(40px + env(safe-area-inset-bottom));max-width:100%}
     .book-3d{height:220px}
     .book-name{font-size:20px}
     .book-deco{font-size:18px}
@@ -827,7 +857,7 @@
     .toolbar{display:none}
     .mobile-quickbar{display:block}
 
-    .editor{padding:16px 16px calc(80px + env(safe-area-inset-bottom))}
+    .editor{max-width:100%;padding:16px 16px calc(80px + env(safe-area-inset-bottom))}
     .editor-title{font-size:26px;margin-bottom:8px}
     .editor-title-wrap{padding:0 32px}
     .editor-title-wrap .voice-inline{position:absolute;right:16px}
@@ -846,6 +876,9 @@
   @media (max-width: 380px){
     .books-grid{grid-template-columns:1fr 1fr}
     .book-3d{height:200px}
+    .editor{padding:14px 14px calc(76px + env(safe-area-inset-bottom))}
+    .editor-title{font-size:24px}
+    .editor-content{font-size:15px;line-height:1.9}
   }
 </style>
 </head>
