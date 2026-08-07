@@ -28,16 +28,17 @@ function escapeCodeHtml(s: string): string {
 export default function EntryEditor({ entry, chapter }: Props) {
   const toast = useUIStore((s) => s.toast)
   const updateEntry = useJournalStore((s) => s.updateEntry)
-  const journals = useJournalStore((s) => s.journals)
-  /** 检查当前 entry 所属 journal 是否还在 store 里（已删除则跳过一切保存行为） */
+  /** 检查当前 entry 所属 journal 是否还在 store 里（已删除则跳过一切保存行为）。
+   *  用 getState() 读取最新值，不订阅 journals，避免 journals 变化导致本回调重建
+   *  进而触发依赖它的 effect（图片位置同步等）反复重跑 → 无限 setState 循环。 */
   const entryStillAlive = useCallback(() => {
-    for (const j of journals) {
+    for (const j of useJournalStore.getState().journals) {
       for (const c of j.chapters) {
         if (c.entries.some((e) => e.id === entry.id)) return true
       }
     }
     return false
-  }, [journals, entry.id])
+  }, [entry.id])
 
   const [title, setTitle] = useState(entry.title)
   const [subtitle, setSubtitle] = useState(entry.subtitle ?? '')
@@ -167,6 +168,9 @@ export default function EntryEditor({ entry, chapter }: Props) {
   }, [scheduleSave])
 
   // 卸载时落盘（只有 entry 仍然存在才执行，防止删除书籍期间对已移除实体写回导致崩溃）
+  // 注意：依赖项不含 entry.content —— cleanup 用 ref 读取最新值，
+  // 若依赖 content，每次自动保存后 content 变化会触发 cleanup 重新执行，
+  // 可能形成"保存→content变→cleanup再保存→"的循环。
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
@@ -190,13 +194,13 @@ export default function EntryEditor({ entry, chapter }: Props) {
             subtitle: f.subtitle,
             date: f.date,
             tags: f.tags,
-            content: editorRef.current?.getHTML() ?? entry.content,
+            content: editorRef.current?.getHTML() ?? '',
           })
         }
         dirtyRef.current = false
       }
     }
-  }, [entry.id, entry.content, updateEntry])
+  }, [entry.id, updateEntry])
 
   // Ctrl/⌘ + S 手动存稿
   useEffect(() => {
