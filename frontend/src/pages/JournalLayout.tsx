@@ -53,7 +53,7 @@ export default function JournalLayout() {
 
       {/* 右侧编辑区 */}
       <section
-        className="relative h-full overflow-hidden"
+        className="relative h-full overflow-hidden animate-pageReveal"
         style={{
           background: 'linear-gradient(180deg, var(--paper) 0%, var(--paper-deep) 100%)',
           boxShadow: 'inset 0 8px 20px rgba(60,40,20,0.1)',
@@ -73,7 +73,7 @@ export default function JournalLayout() {
           </div>
           <button
             onClick={() => setProfileOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper transition-transform hover:scale-105"
+            className="avatar-pulse flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper transition-transform hover:scale-105"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--gold))' }}
             title="个人信息"
           >

@@ -205,17 +205,18 @@ export default function ChapterTree({ journal, onNavigate }: Props) {
                         — 此章尚无篇章 —
                       </div>
                     ) : (
-                      c.entries.map((en) => {
+                      c.entries.map((en, ei) => {
                         const active = en.id === entryId
                         return (
                           <div
                             key={en.id}
                             onClick={() => onEntryClick(en.id)}
-                            className={`group relative flex cursor-pointer items-center gap-2 rounded-[3px] border-l-2 px-2.5 py-1.5 transition-all ${
+                            className={`group relative flex cursor-pointer items-center gap-2 rounded-[3px] border-l-2 px-2.5 py-1.5 transition-all animate-inkDrop ${
                               active
                                 ? 'border-accent bg-[rgba(154,123,58,0.18)]'
                                 : 'border-transparent hover:border-gold hover:bg-[rgba(243,234,215,0.05)]'
                             }`}
+                            style={{ animationDelay: `${ei * 0.05}s` }}
                           >
                             {active && (
                               <span className="absolute -left-[18px] top-1/2 h-3/5 w-[3px] -translate-y-1/2 rounded-r-[3px] bg-gold" />

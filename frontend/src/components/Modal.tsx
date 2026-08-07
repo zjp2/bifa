@@ -32,7 +32,7 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(20,12,6,0.65)] p-4 backdrop-blur-[4px]"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[rgba(20,12,6,0.65)] p-4 backdrop-blur-[4px] animate-backdropIn"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}

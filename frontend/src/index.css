@@ -267,6 +267,93 @@ textarea {
   }
 }
 
+/* —— 书翻开 3D 动画 ——
+   点击书卡时触发：以左边（书脊）为轴 rotateY 翻过去，
+   同时放大、提亮、淡出，营造"翻开书页"的物理感 */
+@keyframes bookOpen {
+  0% {
+    transform: rotateY(0deg) scale(1);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  40% {
+    transform: rotateY(-75deg) scale(1.06);
+    opacity: 0.96;
+    filter: brightness(1.08);
+  }
+  70% {
+    transform: rotateY(-140deg) scale(1.12);
+    opacity: 0.7;
+    filter: brightness(1.1);
+  }
+  100% {
+    transform: rotateY(-180deg) scale(1.18);
+    opacity: 0;
+    filter: brightness(1.15);
+  }
+}
+.book-opening {
+  animation: bookOpen 0.75s cubic-bezier(0.65, 0, 0.85, 0.2) forwards;
+  transform-origin: left center;
+  z-index: 50;
+}
+
+/* —— 书内页首次进入：右页缓缓推开 —— */
+@keyframes pageReveal {
+  from {
+    opacity: 0;
+    transform: translateX(24px) rotateY(6deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) rotateY(0);
+  }
+}
+.animate-pageReveal {
+  animation: pageReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  transform-origin: left center;
+}
+
+/* —— 章节条目逐条落墨 —— */
+@keyframes inkDrop {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
+/* —— Modal 背景渐入 —— */
+@keyframes backdropIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+.animate-backdropIn {
+  animation: backdropIn 0.3s ease forwards;
+}
+
+/* —— 头像按钮按下涟漪 —— */
+@keyframes avatarPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(154, 123, 58, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgba(154, 123, 58, 0);
+  }
+}
+.avatar-pulse:active {
+  animation: avatarPulse 0.5s ease-out;
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.4s ease;
 }
@@ -275,6 +362,9 @@ textarea {
 }
 .animate-slideInLeft {
   animation: slideInLeft 0.35s ease backwards;
+}
+.animate-inkDrop {
+  animation: inkDrop 0.35s ease backwards;
 }
 
 /* ===========================================

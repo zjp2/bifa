@@ -18,6 +18,7 @@ export default function BookshelfPage() {
 
   const [modalOpen, setModalOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [openingBookId, setOpeningBookId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [color, setColor] = useState(BOOK_COLORS[0].value)
@@ -70,7 +71,12 @@ export default function BookshelfPage() {
   }
 
   const onOpen = (b: Journal) => {
-    navigate(`/journal/${b.id}`)
+    if (openingBookId) return // 防止动画期间重复点击
+    setOpeningBookId(b.id)
+    // 等待书翻开动画结束后再导航
+    window.setTimeout(() => {
+      navigate(`/journal/${b.id}`)
+    }, 720)
   }
 
   const totalCount = useMemo(
@@ -116,7 +122,7 @@ export default function BookshelfPage() {
             <button
               onClick={() => setProfileOpen(true)}
               title="个人信息"
-              className="flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper transition-transform hover:scale-105"
+              className="avatar-pulse flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper transition-transform hover:scale-105"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--gold))' }}
             >
               {initialsOf(user.name)}
@@ -141,11 +147,12 @@ export default function BookshelfPage() {
         ) : (
           journals.map((b, idx) => {
             const entryCount = b.chapters.reduce((s, c) => s + c.entries.length, 0)
+            const isOpening = openingBookId === b.id
             return (
               <div
                 key={b.id}
                 onClick={() => onOpen(b)}
-                className="group relative cursor-pointer animate-bookIn"
+                className={`group relative cursor-pointer animate-bookIn ${isOpening ? 'book-opening' : ''}`}
                 style={{ perspective: '1000px', animationDelay: `${idx * 0.08}s` }}
               >
                 <button
@@ -156,7 +163,7 @@ export default function BookshelfPage() {
                   ×
                 </button>
                 <div
-                  className="relative h-[300px] transition-transform duration-500 ease-out group-hover:-translate-y-2 group-hover:[transform:rotateY(-8deg)]"
+                  className={`relative h-[300px] transition-transform duration-500 ease-out group-hover:-translate-y-2 group-hover:[transform:rotateY(-8deg)] ${isOpening ? '!transform-none !transition-none' : ''}`}
                   style={{ transformStyle: 'preserve-3d' }}
                 >
                   <div
