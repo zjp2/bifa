@@ -58,6 +58,10 @@ interface JournalState {
 
 const isGuest = () => useAuthStore.getState().isGuest
 
+/** 后端 date 字段要求 ISO 字符串：把时间戳/字符串统一成 ISO 字符串 */
+const toIsoDate = (d: number | string | undefined): string | undefined =>
+  d === undefined ? undefined : typeof d === 'number' ? new Date(d).toISOString() : d
+
 /** 访客模式：示例数据 */
 function seedSample(): Journal[] {
   const now = Date.now()
@@ -348,7 +352,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
         subtitle: partial?.subtitle ?? '',
         content: partial?.content ?? '',
         tags: partial?.tags ?? [],
-        date: partial?.date ?? now,
+        date: toIsoDate(partial?.date ?? now),
       })
       const e: Entry = {
         ...created,
@@ -392,7 +396,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
           subtitle: patch.subtitle,
           content: patch.content,
           tags: patch.tags,
-          date: patch.date,
+          date: toIsoDate(patch.date),
         })
         .catch((e) => console.warn('[journalStore] 更新条目失败：', e))
     }
