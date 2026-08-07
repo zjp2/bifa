@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useJournalStore } from '@/store/journalStore'
 import { useUIStore } from '@/store/uiStore'
 import Modal from '@/components/Modal'
+import ProfileModal from '@/components/ProfileModal'
 import { BOOK_COLORS, type Journal } from '@/types'
 import { initialsOf } from '@/utils'
 
@@ -11,12 +12,12 @@ export default function BookshelfPage() {
   const navigate = useNavigate()
   const toast = useUIStore((s) => s.toast)
   const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
   const journals = useJournalStore((s) => s.journals)
   const createJournal = useJournalStore((s) => s.createJournal)
   const deleteJournal = useJournalStore((s) => s.deleteJournal)
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [color, setColor] = useState(BOOK_COLORS[0].value)
@@ -110,26 +111,16 @@ export default function BookshelfPage() {
         </h2>
 
         <div className="flex items-center gap-3">
-          {/* 用户头像 + 登出（桌面） */}
+          {/* 用户头像：点击打开个人信息 */}
           {user && (
-            <div className="hidden items-center gap-3 md:flex">
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper"
-                style={{ background: 'linear-gradient(135deg, var(--accent), var(--gold))' }}
-                title={user.email}
-              >
-                {initialsOf(user.name)}
-              </div>
-              <button
-                onClick={() => {
-                  logout()
-                  navigate('/login', { replace: true })
-                }}
-                className="btn-ghost"
-              >
-                退出
-              </button>
-            </div>
+            <button
+              onClick={() => setProfileOpen(true)}
+              title="个人信息"
+              className="flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper transition-transform hover:scale-105"
+              style={{ background: 'linear-gradient(135deg, var(--accent), var(--gold))' }}
+            >
+              {initialsOf(user.name)}
+            </button>
           )}
           <button onClick={openModal} className="btn-ink">
             <span className="font-latin text-[18px] leading-none">+</span> 新立一卷
@@ -309,6 +300,9 @@ export default function BookshelfPage() {
           </button>
         </div>
       </Modal>
+
+      {/* 个人信息弹层 */}
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   )
 }

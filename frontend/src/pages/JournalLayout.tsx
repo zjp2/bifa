@@ -3,6 +3,7 @@ import { Link, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useJournalStore } from '@/store/journalStore'
 import ChapterTree from '@/components/ChapterTree'
+import ProfileModal from '@/components/ProfileModal'
 import { IconBack, IconMenu } from '@/components/icons'
 import { initialsOf } from '@/utils'
 
@@ -11,11 +12,11 @@ export default function JournalLayout() {
   const navigate = useNavigate()
   const { journalId } = useParams()
   const user = useAuthStore((s) => s.user)
-  const logout = useAuthStore((s) => s.logout)
   const journals = useJournalStore((s) => s.journals)
 
   const journal = journals.find((j) => j.id === journalId)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   // 切换书时关闭抽屉
   useEffect(() => {
@@ -71,13 +72,10 @@ export default function JournalLayout() {
             {journal.name}
           </div>
           <button
-            onClick={() => {
-              logout()
-              navigate('/login', { replace: true })
-            }}
-            className="flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper"
+            onClick={() => setProfileOpen(true)}
+            className="flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper transition-transform hover:scale-105"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--gold))' }}
-            title={user?.email}
+            title="个人信息"
           >
             {initialsOf(user?.name)}
           </button>
@@ -112,6 +110,9 @@ export default function JournalLayout() {
           </aside>
         </div>
       )}
+
+      {/* 个人信息弹层 */}
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   )
 }
