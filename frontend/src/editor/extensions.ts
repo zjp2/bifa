@@ -75,8 +75,9 @@ export const RedMark = Mark.create({
 })
 
 /**
- * 自定义图片节点：支持 width 属性，渲染时写入行内样式
- * 同时保留 data-width 以便解析时还原
+ * 自定义图片节点：支持 width / float 属性
+ * - width: 行内样式 + data-width 持久化
+ * - float: left / right / none，通过 data-float + class 控制
  */
 export const InkImage = TiptapImage.extend({
   addAttributes() {
@@ -100,7 +101,29 @@ export const InkImage = TiptapImage.extend({
           }
         },
       },
+      float: {
+        default: 'none' as 'none' | 'left' | 'right',
+        parseHTML: (el) => {
+          const f = (el as HTMLElement).getAttribute('data-float')
+          if (f === 'left' || f === 'right') return f
+          const cls = (el as HTMLElement).className || ''
+          if (cls.includes('float-left')) return 'left'
+          if (cls.includes('float-right')) return 'right'
+          return 'none'
+        },
+        renderHTML: (attrs) => {
+          const f = attrs.float as string
+          if (!f || f === 'none') return {}
+          return { 'data-float': f }
+        },
+      },
     }
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    const float = (node.attrs.float as string) || 'none'
+    const cls = `img-float-${float}`
+    const merged = mergeAttributes(HTMLAttributes, { class: cls })
+    return ['img', merged]
   },
   addCommands() {
     return {
@@ -127,6 +150,28 @@ export const InkImage = TiptapImage.extend({
           }
           return true
         },
+      setImageFloat:
+        (float: 'none' | 'left' | 'right') =>
+        ({ state, tr, dispatch }: Parameters<Command>[0]) => {
+          const { selection } = state
+          if (selection.from !== selection.to) return false
+          const nodeAfter = state.doc.nodeAt(selection.from)
+          const nodeBefore = state.doc.nodeAt(Math.max(0, selection.from - 1))
+          const pos =
+            nodeAfter?.type.name === this.name
+              ? selection.from
+              : nodeBefore?.type.name === this.name
+                ? selection.from - 1
+                : -1
+          if (pos < 0) return false
+          if (dispatch) {
+            tr.setNodeMarkup(pos, undefined, {
+              ...state.doc.nodeAt(pos)!.attrs,
+              float,
+            })
+          }
+          return true
+        },
     } as Record<string, unknown>
   },
 })
@@ -135,6 +180,7 @@ declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     inkImage: {
       setImageWidth: (width: string | null) => ReturnType
+      setImageFloat: (float: 'none' | 'left' | 'right') => ReturnType
     }
   }
 }

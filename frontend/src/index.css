@@ -371,6 +371,28 @@ textarea {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(138, 47, 31, 0.22);
 }
 
+/* 图片浮动：左浮 / 右浮，文字环绕 */
+.ink-editor img.img-float-left {
+  float: left;
+  margin: 0.4em 1.4em 0.5em 0;
+  max-width: 48%;
+}
+.ink-editor img.img-float-right {
+  float: right;
+  margin: 0.4em 0 0.5em 1.4em;
+  max-width: 48%;
+}
+.ink-editor img.img-float-left:hover,
+.ink-editor img.img-float-right:hover {
+  transform: rotate(0) scale(1.01);
+}
+/* 浮动后清除后续段落间距，使文字紧贴图片 */
+.ink-editor::after {
+  content: '';
+  display: table;
+  clear: both;
+}
+
 /* 图片调整尺寸覆盖层 + 手柄 */
 .img-resize-handle {
   position: absolute;

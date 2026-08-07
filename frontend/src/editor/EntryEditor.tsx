@@ -52,6 +52,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
   // 图片选中 & 拖拽调整尺寸
   const [selectedImg, setSelectedImg] = useState<HTMLImageElement | null>(null)
   const [imgWrapperStyle, setImgWrapperStyle] = useState<React.CSSProperties | null>(null)
+  const [imgFloat, setImgFloat] = useState<'none' | 'left' | 'right'>('none')
   const resizeDragRef = useRef<{
     startX: number
     startY: number
@@ -61,6 +62,12 @@ export default function EntryEditor({ entry, chapter }: Props) {
     corner: string
     shift: boolean
     img: HTMLImageElement
+  } | null>(null)
+  // 拖拽移动图片（非缩放）时的状态
+  const moveDragRef = useRef<{
+    startX: number
+    img: HTMLImageElement
+    editorRect: DOMRect
   } | null>(null)
 
   const dateInfo = useMemo(() => fmtDate(date), [date])
@@ -237,6 +244,36 @@ export default function EntryEditor({ entry, chapter }: Props) {
     [selectedImg, editor],
   )
 
+  // 设置选中图片的 float 属性
+  const setFloatForSelectedImg = useCallback(
+    (float: 'none' | 'left' | 'right') => {
+      if (!selectedImg || !editor) return
+      const view = editor.view
+      const pos = view.posAtDOM(selectedImg, 0)
+      if (pos == null) return
+      for (const p of [pos, Math.max(0, pos - 1), Math.min(view.state.doc.nodeSize - 1, pos + 1)]) {
+        const node = view.state.doc.nodeAt(p)
+        if (node && node.type.name === 'image') {
+          editor
+            .chain()
+            .command(({ tr, dispatch }) => {
+              if (dispatch) {
+                tr.setNodeMarkup(p, undefined, { ...node.attrs, float })
+              }
+              return true
+            })
+            .run()
+          // 更新 DOM class
+          selectedImg.classList.remove('img-float-none', 'img-float-left', 'img-float-right')
+          selectedImg.classList.add(`img-float-${float}`)
+          setImgFloat(float)
+          return
+        }
+      }
+    },
+    [selectedImg, editor],
+  )
+
   // 拖拽调整尺寸：全局 mousemove / mouseup
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -337,6 +374,50 @@ export default function EntryEditor({ entry, chapter }: Props) {
           : `${corner}-resize`
   }
 
+  // 拖拽移动图片到左/右侧 → 切换 float
+  // 在选中图片上 mousedown（非手柄区域）时启动
+  const startMoveImg = (e: React.MouseEvent) => {
+    if (!selectedImg || !editor) return
+    const el = editor.view.dom as HTMLElement
+    moveDragRef.current = {
+      startX: e.clientX,
+      img: selectedImg,
+      editorRect: el.getBoundingClientRect(),
+    }
+  }
+
+  // 拖拽移动：全局 mousemove 检测方向
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const d = moveDragRef.current
+      if (!d) return
+      const dx = e.clientX - d.startX
+      const threshold = 40
+      if (Math.abs(dx) < threshold) return
+      // 判断图片在编辑区的相对位置
+      const imgCenter = d.img.getBoundingClientRect().left + d.img.offsetWidth / 2
+      const editorCenter = d.editorRect.left + d.editorRect.width / 2
+      if (dx > threshold && imgCenter > editorCenter - 50) {
+        // 向右拖 → 右浮
+        setFloatForSelectedImg('right')
+        moveDragRef.current = null
+      } else if (dx < -threshold && imgCenter < editorCenter + 50) {
+        // 向左拖 → 左浮
+        setFloatForSelectedImg('left')
+        moveDragRef.current = null
+      }
+    }
+    const onUp = () => {
+      moveDragRef.current = null
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [setFloatForSelectedImg])
+
   // 点击编辑器：选中图片 / 取消选中 / 灯箱
   useEffect(() => {
     const el = editor?.view.dom as HTMLElement | undefined
@@ -356,6 +437,11 @@ export default function EntryEditor({ entry, chapter }: Props) {
         )
         img.classList.add('img-selected')
         setSelectedImg(img)
+        // 读取当前 float 值
+        const cls = img.className || ''
+        if (cls.includes('img-float-left')) setImgFloat('left')
+        else if (cls.includes('img-float-right')) setImgFloat('right')
+        else setImgFloat('none')
       } else {
         // 点空白：取消选中
         ;(el.querySelectorAll('img.img-selected') as NodeListOf<HTMLImageElement>).forEach((i) =>
@@ -559,6 +645,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
               zIndex: 40,
             }}
             className="img-resize-overlay"
+            onMouseDown={startMoveImg}
           >
             {/* 描边选中框 */}
             <div className="absolute inset-0 border-2 border-accent box-border pointer-events-none" />
@@ -578,6 +665,39 @@ export default function EntryEditor({ entry, chapter }: Props) {
                 className={`img-resize-handle side-${c}`}
               />
             ))}
+            {/* 浮动对齐按钮组：显示在选中框上方 */}
+            <div
+              className="absolute left-1/2 -top-9 flex -translate-x-1/2 items-center gap-0.5 rounded-book border border-accent bg-paper px-1 py-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
+              style={{ pointerEvents: 'auto' }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {([
+                { v: 'left', icon: '⇤', label: '左浮' },
+                { v: 'none', icon: '⇔', label: '居中' },
+                { v: 'right', icon: '⇥', label: '右浮' },
+              ] as const).map((btn) => (
+                <button
+                  key={btn.v}
+                  type="button"
+                  title={btn.label}
+                  onClick={() => setFloatForSelectedImg(btn.v)}
+                  className={`flex h-6 w-7 items-center justify-center rounded-[3px] text-[14px] transition-colors ${
+                    imgFloat === btn.v
+                      ? 'bg-accent text-paper'
+                      : 'text-ink-soft hover:bg-paper-deep'
+                  }`}
+                >
+                  {btn.icon}
+                </button>
+              ))}
+            </div>
+            {/* 拖拽提示 */}
+            <div
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none rounded-book bg-[rgba(138,47,31,0.85)] px-2 py-1 font-cn text-[11px] text-paper opacity-0 transition-opacity"
+              style={{ pointerEvents: 'none' }}
+            >
+              拖拽至左右侧浮动
+            </div>
           </div>
         )}
       </div>
