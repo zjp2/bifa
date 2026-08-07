@@ -356,12 +356,64 @@ textarea {
   border: 6px solid var(--paper);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(60, 40, 20, 0.18);
   transform: rotate(-0.5deg);
-  transition: transform 0.3s ease;
-  cursor: zoom-in;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 .ink-editor img:hover {
   transform: rotate(0) scale(1.02);
 }
+.ink-editor img.img-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  transform: rotate(0) scale(1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(138, 47, 31, 0.22);
+}
+
+/* 图片调整尺寸覆盖层 + 手柄 */
+.img-resize-handle {
+  position: absolute;
+  background: var(--paper);
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+  border-radius: 50%;
+  z-index: 5;
+}
+.img-resize-handle.corner-nw,
+.img-resize-handle.corner-ne,
+.img-resize-handle.corner-sw,
+.img-resize-handle.corner-se {
+  width: 14px;
+  height: 14px;
+}
+.img-resize-handle.corner-nw { top: -7px; left: -7px; cursor: nwse-resize; }
+.img-resize-handle.corner-ne { top: -7px; right: -7px; cursor: nesw-resize; }
+.img-resize-handle.corner-sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
+.img-resize-handle.corner-se { bottom: -7px; right: -7px; cursor: nwse-resize; }
+
+.img-resize-handle.side-n,
+.img-resize-handle.side-s {
+  width: 24px;
+  height: 8px;
+  border-radius: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.img-resize-handle.side-n { top: -4px; cursor: ns-resize; }
+.img-resize-handle.side-s { bottom: -4px; cursor: ns-resize; }
+
+.img-resize-handle.side-e,
+.img-resize-handle.side-w {
+  width: 8px;
+  height: 24px;
+  border-radius: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.img-resize-handle.side-e { right: -4px; cursor: ew-resize; }
+.img-resize-handle.side-w { left: -4px; cursor: ew-resize; }
 
 /* 金墨高亮 */
 .ink-editor mark {

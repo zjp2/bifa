@@ -4,7 +4,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
 import { TextStyle } from '@tiptap/extension-text-style'
-import Image from '@tiptap/extension-image'
+
 import Placeholder from '@tiptap/extension-placeholder'
 import { useJournalStore } from '@/store/journalStore'
 import { useUIStore } from '@/store/uiStore'
@@ -13,7 +13,7 @@ import type { Chapter, Entry } from '@/types'
 import Modal from '@/components/Modal'
 import BubbleToolbar from './BubbleToolbar'
 import BottomToolbar from './BottomToolbar'
-import { InkCodeBlock, RedMark } from './extensions'
+import { InkCodeBlock, RedMark, InkImage } from './extensions'
 
 interface Props {
   entry: Entry
@@ -49,6 +49,20 @@ export default function EntryEditor({ entry, chapter }: Props) {
   // 灯箱
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
+  // 图片选中 & 拖拽调整尺寸
+  const [selectedImg, setSelectedImg] = useState<HTMLImageElement | null>(null)
+  const [imgWrapperStyle, setImgWrapperStyle] = useState<React.CSSProperties | null>(null)
+  const resizeDragRef = useRef<{
+    startX: number
+    startY: number
+    startW: number
+    startH: number
+    ratio: number
+    corner: string
+    shift: boolean
+    img: HTMLImageElement
+  } | null>(null)
+
   const dateInfo = useMemo(() => fmtDate(date), [date])
 
   // 自动保存：脏标记 + 800ms 防抖
@@ -67,7 +81,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
       Underline,
       Highlight.configure({ multicolor: false }),
       TextStyle,
-      Image.configure({ inline: false, allowBase64: true }),
+      InkImage.configure({ inline: false, allowBase64: true }),
       Placeholder.configure({ placeholder: '此处落墨，记录此刻心绪……' }),
       InkCodeBlock,
       RedMark,
@@ -86,6 +100,8 @@ export default function EntryEditor({ entry, chapter }: Props) {
   const editorRef = useRef(editor)
   useEffect(() => {
     editorRef.current = editor
+    // 测试用途：暴露 editor 到 window
+    if (editor) (window as any).__inkEditor = editor
   }, [editor])
 
   // 把最新字段塞进 ref，保证保存时拿到最新值
@@ -162,17 +178,205 @@ export default function EntryEditor({ entry, chapter }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [flushSave])
 
-  // 点击编辑器内图片 → 灯箱
+  // 选中图片的 DOM 位置同步：当选中图片存在时，持续计算其在编辑区中的位置 → 更新手柄容器位置
   useEffect(() => {
-    const el = editor?.view.dom
+    if (!selectedImg) {
+      setImgWrapperStyle(null)
+      return
+    }
+    const sync = () => {
+      const el = editor?.view.dom as HTMLElement | undefined
+      if (!el) return
+      const imgRect = selectedImg.getBoundingClientRect()
+      const containerRect = el.getBoundingClientRect()
+      setImgWrapperStyle({
+        position: 'absolute',
+        left: imgRect.left - containerRect.left,
+        top: imgRect.top - containerRect.top,
+        width: imgRect.width,
+        height: imgRect.height,
+        pointerEvents: 'none',
+      })
+    }
+    sync()
+    const t = setInterval(sync, 120)
+    window.addEventListener('scroll', sync, true)
+    window.addEventListener('resize', sync)
+    return () => {
+      clearInterval(t)
+      window.removeEventListener('scroll', sync, true)
+      window.removeEventListener('resize', sync)
+    }
+  }, [selectedImg, editor])
+
+  // 选中图片时在 Tiptap 中定位对应节点（以便 setImageWidth 更新）
+  const setWidthForSelectedImg = useCallback(
+    (widthPx: number) => {
+      if (!selectedImg || !editor) return
+      const view = editor.view
+      const pos = view.posAtDOM(selectedImg, 0)
+      if (pos == null) return
+      // 尝试向前/向后寻找图片节点
+      for (const p of [pos, Math.max(0, pos - 1), Math.min(view.state.doc.nodeSize - 1, pos + 1)]) {
+        const node = view.state.doc.nodeAt(p)
+        if (node && node.type.name === 'image') {
+          const w = `${Math.round(widthPx)}px`
+          editor
+            .chain()
+            .command(({ tr, dispatch }) => {
+              if (dispatch) {
+                tr.setNodeMarkup(p, undefined, { ...node.attrs, width: w })
+              }
+              return true
+            })
+            .run()
+          return
+        }
+      }
+    },
+    [selectedImg, editor],
+  )
+
+  // 拖拽调整尺寸：全局 mousemove / mouseup
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const d = resizeDragRef.current
+      if (!d) return
+      e.preventDefault()
+      const dx = e.clientX - d.startX
+      const dy = e.clientY - d.startY
+      let newW = d.startW
+      let newH = d.startH
+      const ratio = d.ratio
+      const shift = e.shiftKey || d.shift
+      const expand = (x: number, y: number) => {
+        if (shift) {
+          // 以宽度为准，保持比例
+          newW = Math.max(80, d.startW + x)
+          newH = newW / ratio
+        } else {
+          newW = Math.max(80, d.startW + x)
+          newH = Math.max(60, d.startH + y)
+        }
+      }
+      switch (d.corner) {
+        case 'se':
+          expand(dx, dy)
+          break
+        case 'sw':
+          expand(-dx, dy)
+          break
+        case 'ne':
+          expand(dx, -dy)
+          break
+        case 'nw':
+          expand(-dx, -dy)
+          break
+        case 'e':
+          newW = Math.max(80, d.startW + dx)
+          newH = shift ? newW / ratio : d.startH
+          break
+        case 'w':
+          newW = Math.max(80, d.startW - dx)
+          newH = shift ? newW / ratio : d.startH
+          break
+        case 's':
+          newH = Math.max(60, d.startH + dy)
+          newW = shift ? newH * ratio : d.startW
+          break
+        case 'n':
+          newH = Math.max(60, d.startH - dy)
+          newW = shift ? newH * ratio : d.startW
+          break
+      }
+      // 实时修改 DOM 宽度（先不写入文档，mouseup 再 commit）
+      d.img.style.width = `${Math.round(newW)}px`
+      d.img.style.height = shift ? `${Math.round(newH)}px` : ''
+      setImgWrapperStyle((s) => (s ? { ...s, width: Math.round(newW), height: Math.round(newH) } : s))
+    }
+    const onUp = () => {
+      const d = resizeDragRef.current
+      if (!d) return
+      resizeDragRef.current = null
+      // 若保持比例且设置了 height，把 height 清掉（以 width 为准）
+      if (d.img.style.height) d.img.style.height = ''
+      const rect = d.img.getBoundingClientRect()
+      setWidthForSelectedImg(rect.width)
+      scheduleSave(300)
+      document.body.style.cursor = ''
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [setWidthForSelectedImg, scheduleSave])
+
+  const startResize = (corner: string) => (e: React.MouseEvent) => {
+    if (!selectedImg) return
+    e.stopPropagation()
+    e.preventDefault()
+    const w = selectedImg.offsetWidth
+    const h = selectedImg.offsetHeight
+    resizeDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: w,
+      startH: h,
+      ratio: w / h,
+      corner,
+      shift: e.shiftKey,
+      img: selectedImg,
+    }
+    document.body.style.cursor =
+      corner === 'n' || corner === 's'
+        ? 'ns-resize'
+        : corner === 'e' || corner === 'w'
+          ? 'ew-resize'
+          : `${corner}-resize`
+  }
+
+  // 点击编辑器：选中图片 / 取消选中 / 灯箱
+  useEffect(() => {
+    const el = editor?.view.dom as HTMLElement | undefined
     if (!el) return
     const onClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      if (target.tagName === 'IMG') setLightboxSrc((target as HTMLImageElement).src)
+      if (target.tagName === 'IMG') {
+        const img = target as HTMLImageElement
+        // 同一图片被再次点击（已选中）→ 打开灯箱
+        if (img === selectedImg) {
+          setLightboxSrc(img.src)
+          return
+        }
+        // 给所有图片移除选中态 class
+        ;(el.querySelectorAll('img.img-selected') as NodeListOf<HTMLImageElement>).forEach((i) =>
+          i.classList.remove('img-selected'),
+        )
+        img.classList.add('img-selected')
+        setSelectedImg(img)
+      } else {
+        // 点空白：取消选中
+        ;(el.querySelectorAll('img.img-selected') as NodeListOf<HTMLImageElement>).forEach((i) =>
+          i.classList.remove('img-selected'),
+        )
+        setSelectedImg(null)
+      }
     }
     el.addEventListener('click', onClick)
     return () => el.removeEventListener('click', onClick)
-  }, [editor])
+  }, [editor, selectedImg])
+
+  // 条目切换/卸载时：取消选中
+  useEffect(() => {
+    return () => {
+      setSelectedImg(null)
+      const el = editor?.view.dom as HTMLElement | undefined
+      el?.querySelectorAll('img.img-selected').forEach((i) => i.classList.remove('img-selected'))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry.id])
 
   /* ---------- 标签 ---------- */
   const addTag = (val: string) => {
@@ -344,7 +548,39 @@ export default function EntryEditor({ entry, chapter }: Props) {
       </div>
 
       {/* Tiptap 编辑器 */}
-      <EditorContent editor={editor} />
+      <div className="relative">
+        <EditorContent editor={editor} />
+        {/* 图片选中手柄覆盖层：跟随图片位置 */}
+        {imgWrapperStyle && selectedImg && (
+          <div
+            style={{
+              ...imgWrapperStyle,
+              pointerEvents: 'none',
+              zIndex: 40,
+            }}
+            className="img-resize-overlay"
+          >
+            {/* 描边选中框 */}
+            <div className="absolute inset-0 border-2 border-accent box-border pointer-events-none" />
+            {/* 四角手柄 */}
+            {(['nw', 'ne', 'sw', 'se'] as const).map((c) => (
+              <span
+                key={c}
+                onMouseDown={startResize(c)}
+                className={`img-resize-handle corner-${c}`}
+              />
+            ))}
+            {/* 四边手柄 */}
+            {(['n', 's', 'e', 'w'] as const).map((c) => (
+              <span
+                key={c}
+                onMouseDown={startResize(c)}
+                className={`img-resize-handle side-${c}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 气泡 + 底部工具条 */}
       <BubbleToolbar editor={editor} />
