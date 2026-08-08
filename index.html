@@ -458,8 +458,9 @@
   .new-book-btn .plus{font-family:"Cormorant Garamond",serif;font-size:18px;line-height:0}
 
   .books-grid{
-    display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+    display:grid;grid-template-columns:repeat(auto-fill, 260px);
     gap:44px 40px;max-width:1200px;margin:0 auto;padding:20px 40px 80px;
+    justify-content:center;align-content:start;
   }
   .book-card{cursor:pointer;perspective:1000px;position:relative;animation:bookIn 0.5s ease backwards}
   @keyframes bookIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
@@ -807,7 +808,7 @@
     .editor{max-width:960px;padding:80px 100px 140px}
     .editor-title{font-size:42px}
     .editor-content{font-size:18px;line-height:2.1}
-    .books-grid{max-width:1300px;gap:48px 44px}
+    .books-grid{max-width:1300px;gap:48px 44px;grid-template-columns:repeat(auto-fill, 280px)}
     .shelf-toolbar{max-width:1300px}
   }
 
@@ -815,7 +816,7 @@
   @media (min-width: 1200px) and (max-width: 1599px){
     .book-view{grid-template-columns:320px 1fr}
     .editor{max-width:900px;padding:70px 90px 130px}
-    .books-grid{max-width:1180px}
+    .books-grid{max-width:1180px;grid-template-columns:repeat(auto-fill, 260px)}
     .shelf-toolbar{max-width:1180px}
   }
 
@@ -832,22 +833,37 @@
     .editor-title{font-size:32px}
     .editor-content{font-size:16px}
     .shelf-toolbar{max-width:100%;padding:0 28px 20px}
-    .books-grid{max-width:100%;gap:32px 28px;padding:16px 28px 60px}
+    .books-grid{max-width:100%;grid-template-columns:repeat(auto-fill, 220px);gap:32px 28px;padding:16px 28px 60px;justify-content:center}
   }
 
   /* 移动端：≤768px */
   @media (max-width: 768px){
-    .brand-big{font-size:48px;letter-spacing:4px}
-    .brand-en{font-size:13px;letter-spacing:4px}
-    .shelf-header{padding:30px 16px 16px}
-    .shelf-toolbar{padding:0 16px 16px;max-width:100%}
-    .books-grid{grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:20px 16px;padding:12px 16px calc(40px + env(safe-area-inset-bottom));max-width:100%}
+    .brand-big{font-size:40px;letter-spacing:3px}
+    .brand-en{font-size:12px;letter-spacing:3px}
+    .brand-tagline{font-size:13px;margin-top:10px}
+    .shelf-header{padding:28px 16px 14px}
+    .shelf-toolbar{
+      padding:0 16px 16px;max-width:100%;
+      flex-direction:column;align-items:stretch;gap:12px;
+    }
+    .shelf-title{
+      font-size:20px;justify-content:space-between;
+    }
+    .shelf-title .count{font-size:13px}
+    .new-book-btn{
+      padding:12px 16px;font-size:13px;letter-spacing:1px;
+      width:100%;justify-content:center;
+    }
+    .books-grid{
+      grid-template-columns:repeat(auto-fill, 152px);
+      gap:20px 14px;padding:12px 14px calc(40px + env(safe-area-inset-bottom));
+      max-width:100%;justify-content:center;
+    }
     .book-3d{height:220px}
     .book-name{font-size:20px}
     .book-deco{font-size:18px}
     .book-desc{font-size:11px}
     .book-foot{font-size:10px}
-    .new-book-btn{padding:10px 14px;font-size:12px;letter-spacing:1px}
 
     /* Mobile view swap */
     .book-view{grid-template-columns:1fr}
@@ -874,8 +890,9 @@
   }
 
   @media (max-width: 380px){
-    .books-grid{grid-template-columns:1fr 1fr}
+    .books-grid{grid-template-columns:repeat(auto-fill, 140px);gap:16px 12px;justify-content:center}
     .book-3d{height:200px}
+    .book-name{font-size:18px}
     .editor{padding:14px 14px calc(76px + env(safe-area-inset-bottom))}
     .editor-title{font-size:24px}
     .editor-content{font-size:15px;line-height:1.9}
