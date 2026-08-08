@@ -1,0 +1,4 @@
+.trae-html-share-packages/
+.DS_Store
+node_modules/
+dist/
