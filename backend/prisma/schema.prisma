@@ -1,0 +1,63 @@
+// 墨笺 · Inkwell Journal — Prisma schema
+// 开发环境使用 SQLite，正式版可平滑切换到 PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  journals  Journal[]
+
+  @@map("users")
+}
+
+model Journal {
+  id          String    @id @default(uuid())
+  ownerId     String    @map("owner_id")
+  name        String
+  description String?
+  color       String    @default("#8a2f1f")
+  coverImage  String?   @map("cover_image")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  chapters    Chapter[]
+
+  @@map("journals")
+}
+
+model Chapter {
+  id        String   @id @default(uuid())
+  journalId String   @map("journal_id")
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  journal   Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  entries   Entry[]
+
+  @@map("chapters")
+}
+
+model Entry {
+  id        String   @id @default(uuid())
+  chapterId String   @map("chapter_id")
+  title     String?
+  subtitle  String?
+  content   String?
+  // SQLite 不支持原生 String[]，改用 Json 存储（与正式版 JSONB 语义一致）
+  tags      Json     @default("[]")
+  date      DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@map("entries")
+}

@@ -1,0 +1,9 @@
+node_modules
+# 构建产物
+dist
+# 环境变量（含密钥，勿提交）
+.env
+# SQLite 开发数据库
+*.db
+*.db-journal
+

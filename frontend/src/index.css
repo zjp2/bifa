@@ -1,0 +1,827 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================
+   墨笺 · Inkwell Journal — 全局样式
+   古籍手札美学：宣纸纹理、木纹书架、装饰符号、暗角光晕
+   =========================================== */
+:root {
+  --paper: #f3ead7;
+  --paper-deep: #ead9bd;
+  --paper-shadow: #d9c29a;
+  --ink: #231a12;
+  --ink-soft: #4a3a2a;
+  --ink-faded: #7a6650;
+  --accent: #8a2f1f;
+  --accent-soft: #b85544;
+  --gold: #9a7b3a;
+  --leaf: #5a6b3a;
+  --margin-line: #c9b48a;
+  --shelf: #3b2a1c;
+  --shelf-deep: #241710;
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Spectral', 'Noto Serif SC', Georgia, serif;
+  color: var(--ink);
+  background: var(--paper);
+  overflow: hidden;
+  position: relative;
+  overscroll-behavior: none;
+}
+
+/* 宣纸噪点纹理 + 鎏金/朱砂晕染 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(154, 123, 58, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(138, 47, 31, 0.04) 0%, transparent 45%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.14 0 0 0 0 0.10 0 0 0 0 0.07 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+/* 暗角光晕 */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(60, 40, 20, 0.18) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+input,
+button,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+#root {
+  position: relative;
+  z-index: 5;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--margin-line);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ===========================================
+   组件层：通用类
+   =========================================== */
+@layer components {
+  /* 装饰性符号 */
+  .ornament {
+    font-family: 'Cormorant Garamond', serif;
+    color: var(--accent);
+  }
+
+  /* 主按钮（墨色实心） */
+  .btn-ink {
+    @apply relative inline-flex items-center justify-center gap-2 rounded-book px-5 py-2.5
+      font-cn text-sm tracking-widest text-paper transition-all duration-200;
+    background: var(--ink);
+  }
+  .btn-ink::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px solid rgba(243, 234, 215, 0.3);
+    pointer-events: none;
+  }
+  .btn-ink:hover {
+    background: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  /* 次按钮（描边） */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-book border px-4 py-2.5
+      font-latin italic text-[13px] tracking-wider transition-all duration-200;
+    border-color: var(--margin-line);
+    color: var(--ink-soft);
+    background: transparent;
+  }
+  .btn-ghost:hover {
+    border-color: var(--ink-soft);
+    color: var(--ink);
+  }
+
+  /* 顶部栏小按钮 */
+  .btn-topbar {
+    @apply inline-flex items-center gap-1.5 rounded-book border px-3.5 py-2
+      font-cn text-xs tracking-wider transition-all duration-200;
+    background: rgba(35, 26, 18, 0.06);
+    border-color: var(--margin-line);
+    color: var(--ink-soft);
+  }
+  .btn-topbar:hover {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .btn-topbar.danger:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* 木纹背景（书架/侧栏共用） */
+  .wood-texture {
+    position: relative;
+  }
+  .wood-texture::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='wood'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.015 0.6' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0.18 0 0 0 0 0.10 0 0 0 0 0.05 0 0 0 0.4 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23wood)'/%3E%3C/svg%3E");
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .wood-texture > * {
+    position: relative;
+    z-index: 2;
+  }
+
+  /* 模态卡片 */
+  .modal-card {
+    @apply relative w-full max-w-[440px] rounded-[8px] px-7 pb-7 pt-9;
+    background: var(--paper);
+    border: 1px solid var(--paper-shadow);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-card::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border: 1px solid var(--margin-line);
+    pointer-events: none;
+    border-radius: 4px;
+  }
+
+  /* 模态输入框 */
+  .modal-input {
+    @apply w-full px-1 py-2 font-cn text-[15px] outline-none transition-all duration-200;
+    background: rgba(255, 251, 240, 0.7);
+    border: none;
+    border-bottom: 1px solid var(--ink-faded);
+  }
+  .modal-input:focus {
+    border-bottom-color: var(--accent);
+    background: rgba(255, 251, 240, 1);
+  }
+
+  .modal-label {
+    @apply mb-1.5 block font-latin italic text-[11px] uppercase tracking-widest;
+    color: var(--ink-faded);
+  }
+}
+
+/* ===========================================
+   动画
+   =========================================== */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tagIn {
+  from {
+    opacity: 0;
+    transform: scale(0.7) rotate(-5deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    color: var(--paper);
+  }
+  50% {
+    color: var(--accent-soft);
+  }
+}
+@keyframes blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* —— 书翻开动画由 OpeningBookOverlay 组件用内联 transition 实现 —— */
+
+/* —— 书内页首次进入：右页缓缓推开 —— */
+@keyframes pageReveal {
+  from {
+    opacity: 0;
+    transform: translateX(24px) rotateY(6deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) rotateY(0);
+  }
+}
+.animate-pageReveal {
+  animation: pageReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  transform-origin: left center;
+}
+
+/* —— 章节条目逐条落墨 —— */
+@keyframes inkDrop {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
+/* —— Modal 背景渐入 —— */
+@keyframes backdropIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+.animate-backdropIn {
+  animation: backdropIn 0.3s ease forwards;
+}
+
+/* —— 头像按钮按下涟漪 —— */
+@keyframes avatarPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(154, 123, 58, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgba(154, 123, 58, 0);
+  }
+}
+.avatar-pulse:active {
+  animation: avatarPulse 0.5s ease-out;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease;
+}
+.animate-slideUp {
+  animation: slideUp 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.animate-slideInLeft {
+  animation: slideInLeft 0.35s ease backwards;
+}
+.animate-inkDrop {
+  animation: inkDrop 0.35s ease backwards;
+}
+
+/* ===========================================
+   Tiptap 编辑器内容样式（ProseMirror）
+   =========================================== */
+.ink-editor.ProseMirror {
+  min-height: 400px;
+  font-family: 'Spectral', 'Noto Serif SC', serif;
+  font-size: 17px;
+  line-height: 2;
+  color: var(--ink);
+  outline: none;
+}
+.ink-editor.ProseMirror-focused {
+  outline: none;
+}
+
+/* 占位符 */
+.ink-editor.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--margin-line);
+  font-style: italic;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* 段落：首行缩进 + 段首大字下沉 */
+.ink-editor p {
+  margin-bottom: 1em;
+  text-indent: 2em;
+}
+.ink-editor p:first-of-type::first-letter {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.6em;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+}
+
+/* 小标题：左侧朱砂竖线 */
+.ink-editor h3 {
+  font-family: 'Noto Serif SC', serif;
+  font-size: 20px;
+  margin: 1.4em 0 0.6em;
+  color: var(--ink);
+  position: relative;
+  padding-left: 14px;
+}
+.ink-editor h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--accent);
+}
+
+/* 引言：朱砂双线 + 米色底纹 */
+.ink-editor blockquote {
+  margin: 1.2em 0;
+  padding: 8px 18px;
+  border-left: 3px double var(--accent);
+  font-style: italic;
+  color: var(--ink-soft);
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  background: rgba(154, 123, 58, 0.05);
+}
+
+/* 图片：相纸白边 + 轻微旋转 */
+.ink-editor img {
+  max-width: 100%;
+  display: block;
+  margin: 1.5em auto;
+  border: 6px solid var(--paper);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(60, 40, 20, 0.18);
+  transform: rotate(-0.5deg);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.ink-editor img:hover {
+  transform: rotate(0) scale(1.02);
+}
+.ink-editor img.img-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  transform: rotate(0) scale(1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(138, 47, 31, 0.22);
+}
+
+/* 图片浮动：左浮 / 右浮，文字环绕 */
+.ink-editor img.img-float-left {
+  float: left;
+  margin: 0.4em 1.4em 0.5em 0;
+  max-width: 48%;
+}
+.ink-editor img.img-float-right {
+  float: right;
+  margin: 0.4em 0 0.5em 1.4em;
+  max-width: 48%;
+}
+.ink-editor img.img-float-left:hover,
+.ink-editor img.img-float-right:hover {
+  transform: rotate(0) scale(1.01);
+}
+/* 浮动后清除后续段落间距，使文字紧贴图片 */
+.ink-editor::after {
+  content: '';
+  display: table;
+  clear: both;
+}
+
+/* 图片调整尺寸覆盖层 + 手柄 */
+.img-resize-handle {
+  position: absolute;
+  background: var(--paper);
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+  border-radius: 50%;
+  z-index: 5;
+}
+.img-resize-handle.corner-nw,
+.img-resize-handle.corner-ne,
+.img-resize-handle.corner-sw,
+.img-resize-handle.corner-se {
+  width: 14px;
+  height: 14px;
+}
+.img-resize-handle.corner-nw { top: -7px; left: -7px; cursor: nwse-resize; }
+.img-resize-handle.corner-ne { top: -7px; right: -7px; cursor: nesw-resize; }
+.img-resize-handle.corner-sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
+.img-resize-handle.corner-se { bottom: -7px; right: -7px; cursor: nwse-resize; }
+
+.img-resize-handle.side-n,
+.img-resize-handle.side-s {
+  width: 24px;
+  height: 8px;
+  border-radius: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.img-resize-handle.side-n { top: -4px; cursor: ns-resize; }
+.img-resize-handle.side-s { bottom: -4px; cursor: ns-resize; }
+
+.img-resize-handle.side-e,
+.img-resize-handle.side-w {
+  width: 8px;
+  height: 24px;
+  border-radius: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.img-resize-handle.side-e { right: -4px; cursor: ew-resize; }
+.img-resize-handle.side-w { left: -4px; cursor: ew-resize; }
+
+/* 金墨高亮 */
+.ink-editor mark {
+  background: linear-gradient(180deg, transparent 50%, rgba(154, 123, 58, 0.45) 50%);
+  color: var(--ink);
+  padding: 0 2px;
+  border-radius: 1px;
+}
+
+/* 朱砂批注 */
+.ink-editor .highlight-red {
+  background: linear-gradient(180deg, transparent 60%, rgba(138, 47, 31, 0.25) 60%);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* 列表 */
+.ink-editor ul,
+.ink-editor ol {
+  margin: 1em 0 1em 2.5em;
+  padding-left: 0.5em;
+}
+.ink-editor ul {
+  list-style: none;
+}
+.ink-editor ul li {
+  position: relative;
+}
+.ink-editor ul li::before {
+  content: '·';
+  color: var(--gold);
+  font-weight: 700;
+  position: absolute;
+  left: -1.2em;
+}
+.ink-editor ol {
+  list-style: decimal;
+}
+.ink-editor ol li::marker {
+  color: var(--gold);
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+}
+.ink-editor li {
+  margin-bottom: 0.4em;
+  text-indent: 0;
+}
+.ink-editor li p {
+  text-indent: 0;
+  margin-bottom: 0.3em;
+}
+.ink-editor li p:first-of-type::first-letter {
+  font-size: 1em;
+  font-weight: inherit;
+  color: inherit;
+  font-family: inherit;
+}
+
+/* 代码块：深色木匣质感 + 朱砂左竖线 + JetBrains Mono + 语言标签 */
+.ink-editor pre.code-block {
+  background: linear-gradient(180deg, #2a1d12 0%, #1a110a 100%);
+  color: #e8dcc4;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  padding: 16px 18px 14px;
+  margin: 1.4em 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, 'Liberation Mono', monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre;
+  position: relative;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(243, 234, 215, 0.05);
+}
+.ink-editor pre.code-block::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 10px;
+  color: var(--gold);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.ink-editor pre.code-block code {
+  font-family: inherit;
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+.ink-editor pre.code-block::-webkit-scrollbar {
+  height: 6px;
+}
+.ink-editor pre.code-block::-webkit-scrollbar-thumb {
+  background: rgba(243, 234, 215, 0.2);
+  border-radius: 3px;
+}
+/* lowlight 语法高亮配色（暖色调，呼应木匣） */
+.ink-editor .hljs-comment,
+.ink-editor .hljs-quote {
+  color: #8a7a60;
+  font-style: italic;
+}
+.ink-editor .hljs-keyword,
+.ink-editor .hljs-selector-tag,
+.ink-editor .hljs-built_in {
+  color: #d9a45a;
+}
+.ink-editor .hljs-string,
+.ink-editor .hljs-attr {
+  color: #c7a87a;
+}
+.ink-editor .hljs-number,
+.ink-editor .hljs-literal {
+  color: #b85544;
+}
+.ink-editor .hljs-title,
+.ink-editor .hljs-section,
+.ink-editor .hljs-name {
+  color: #e8c97a;
+}
+.ink-editor .hljs-variable,
+.ink-editor .hljs-template-variable {
+  color: #e8dcc4;
+}
+.ink-editor .hljs-type,
+.ink-editor .hljs-class .hljs-title {
+  color: #d9a45a;
+}
+.ink-editor .hljs-meta {
+  color: #8a7a60;
+}
+.ink-editor .hljs-emphasis {
+  font-style: italic;
+}
+.ink-editor .hljs-strong {
+  font-weight: 700;
+}
+
+/* 行内代码：鎏金半透明背景 + 朱砂字色 */
+.ink-editor code.inline-code {
+  background: rgba(154, 123, 58, 0.18);
+  color: var(--accent);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 0.88em;
+  border: 1px solid rgba(154, 123, 58, 0.25);
+}
+
+/* 分割线 */
+.ink-editor hr {
+  border: none;
+  border-top: 1px dashed var(--margin-line);
+  margin: 1.4em 0;
+  position: relative;
+}
+.ink-editor hr::after {
+  content: '❦';
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--paper);
+  color: var(--accent);
+  padding: 0 12px;
+  font-size: 16px;
+}
+
+/* 链接 */
+.ink-editor a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+/* ===========================================
+   Tiptap 气泡 / 工具条
+   =========================================== */
+.ink-bubble {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  background: linear-gradient(180deg, rgba(59, 42, 28, 0.98) 0%, rgba(36, 23, 16, 0.98) 100%);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(243, 234, 215, 0.12);
+  border: 1px solid rgba(243, 234, 215, 0.12);
+  padding: 4px;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ink-bubble::-webkit-scrollbar {
+  display: none;
+}
+.ink-bubble-btn {
+  flex-shrink: 0;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  color: var(--paper);
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 15px;
+  transition: all 0.15s ease;
+}
+.ink-bubble-btn:hover {
+  background: rgba(243, 234, 215, 0.14);
+}
+.ink-bubble-btn:active {
+  transform: scale(0.9);
+  background: rgba(154, 123, 58, 0.4);
+}
+.ink-bubble-btn.is-active {
+  background: var(--gold);
+  color: var(--shelf-deep);
+}
+.ink-bubble-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+.ink-bubble-btn b {
+  font-family: 'Noto Serif SC';
+  font-weight: 700;
+  font-size: 13px;
+}
+.ink-bubble-btn i {
+  font-family: 'Spectral';
+  font-style: italic;
+  font-size: 14px;
+}
+.ink-bubble-btn u {
+  text-decoration: underline;
+  font-size: 13px;
+}
+.ink-bubble-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: 18px;
+  background: rgba(243, 234, 215, 0.18);
+  margin: 0 2px;
+}
+
+/* 底部工具条 */
+.ink-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: var(--shelf);
+  border-radius: 4px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.ink-tool-btn {
+  background: transparent;
+  border: none;
+  color: var(--paper);
+  width: 36px;
+  height: 36px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.ink-tool-btn:hover {
+  background: rgba(243, 234, 215, 0.15);
+}
+.ink-tool-btn.is-active {
+  background: var(--gold);
+  color: var(--shelf-deep);
+}
+.ink-tool-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.ink-tool-divider {
+  width: 1px;
+  background: rgba(243, 234, 215, 0.2);
+  margin: 4px 2px;
+}
+.ink-tool-btn[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--paper);
+  padding: 4px 8px;
+  font-family: 'Noto Serif SC', serif;
+  font-size: 11px;
+  white-space: nowrap;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* ===========================================
+   移动端
+   =========================================== */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (max-width: 768px) {
+  .ink-editor.ProseMirror {
+    font-size: 16px;
+    min-height: 300px;
+  }
+}
