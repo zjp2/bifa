@@ -130,7 +130,7 @@ inkwell_data_v3  // { journals[], current*, collapsedChapters }
 
 ## 技术栈
 
-### 当前原型
+### 原型版（单文件演示）
 
 | 层 | 技术 |
 |---|---|
@@ -140,18 +140,18 @@ inkwell_data_v3  // { journals[], current*, collapsedChapters }
 | 存储 | localStorage |
 | 字体 | Google Fonts |
 
-### 正式版规划
+### 正式版（开发中）
 
-| 层 | 推荐 |
+| 层 | 技术 |
 |---|---|
-| 前端框架 | React + Vite + TypeScript |
-| 富文本 | Tiptap / Lexical / ProseMirror（替换 execCommand） |
+| 前端框架 | React 19 + Vite + TypeScript |
+| 富文本 | Tiptap |
 | 状态管理 | Zustand |
-| 样式 | Tailwind + CSS 变量 |
-| 后端 | NestJS / Express + Prisma + PostgreSQL |
+| 样式 | Tailwind CSS + CSS 变量 |
+| 后端 | NestJS + Prisma |
+| 数据库 | SQLite（开发）/ PostgreSQL（生产） |
 | 鉴权 | JWT + bcrypt |
-| 图片存储 | Cloudflare R2 / 阿里云 OSS |
-| 部署 | Docker + VPS，或 Railway + Supabase |
+| 代码质量 | ESLint / OxLint + Prettier |
 
 ---
 
@@ -236,19 +236,69 @@ CREATE TABLE entries (
 
 ## 快速开始
 
-原型版无需构建，直接打开 `index.html` 即可。
+### 环境要求
 
-正式版（待开发）：
+- Node.js 18+
+- npm 9+
+
+### 原型版（纯前端）
+
+无需构建，直接在浏览器中打开根目录 `index.html` 即可体验。
+
+### 正式版（React + NestJS）
+
+项目采用前后端分离架构，需分别启动后端和前端服务。
+
+**1. 启动后端**
 
 ```bash
-# 前端
-cd frontend && npm install && npm run dev
+cd backend
 
+# 安装依赖
+npm install
+
+# 初始化数据库（开发环境使用 SQLite，无需额外安装数据库）
+npx prisma migrate dev --name init
+
+# （可选）填充示例数据
+npm run db:seed
+
+# 启动开发服务器（默认端口 3000）
+npm run start:dev
+```
+
+后端启动后访问：http://localhost:3000
+
+**2. 启动前端**
+
+新开一个终端窗口：
+
+```bash
+cd frontend
+
+# 安装依赖
+npm install
+
+# 启动开发服务器（默认端口 5173）
+npm run dev
+```
+
+前端启动后访问：http://localhost:5173
+
+**3. 常用命令**
+
+```bash
 # 后端
-cd backend && npm install && npm run start:dev
+cd backend
+npm run build          # 构建生产版本
+npm run start:prod     # 运行生产版本
+npm run lint           # 代码检查
 
-# 数据库
-docker compose up -d postgres
+# 前端
+cd frontend
+npm run build          # 构建生产版本
+npm run preview        # 预览生产构建
+npm run lint           # 代码检查
 ```
 
 ---
