@@ -4,3 +4,8 @@ node_modules/
 dist/
 .npm-cache/
 .node-gyp/
+*.log
+.env.local
+.env.*.local
+backend/logs/
+backend/dev.db

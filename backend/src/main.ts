@@ -11,9 +11,12 @@ async function bootstrap() {
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ limit: '10mb', extended: true }));
 
-  // CORS：允许前端 http://localhost:5173 访问
+  // CORS：开发允许 localhost，生产允许所有同源请求（由 Nginx 反代）
+  const isProd = process.env.NODE_ENV === 'production';
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: isProd
+      ? true
+      : ['http://localhost:5173', 'http://192.168.31.240:5173'],
     credentials: true,
   });
 
