@@ -93,56 +93,56 @@ export default function BookshelfPage() {
       style={{ background: 'linear-gradient(180deg, var(--paper) 0%, var(--paper-deep) 100%)' }}
     >
       {/* 品牌头 */}
-      <header className="relative px-10 pb-8 pt-[60px] text-center">
+      <header className="relative px-5 pb-5 pt-10 text-center md:px-10 md:pb-8 md:pt-[60px]">
         <div
-          className="font-brush text-[72px] leading-none text-ink"
+          className="font-brush text-[48px] leading-none text-ink md:text-[72px]"
           style={{ letterSpacing: '8px', textShadow: '2px 2px 0 rgba(154,123,58,0.15)' }}
         >
           墨笺
         </div>
-        <div className="mt-2 font-latin text-[18px] uppercase tracking-[8px] text-ink-faded">
+        <div className="mt-2 font-latin text-[14px] uppercase tracking-[6px] text-ink-faded md:text-[18px] md:tracking-[8px]">
           Inkwell Journal
         </div>
-        <div className="mt-3.5 font-latin text-[15px] italic tracking-wide text-ink-soft">
+        <div className="mt-2 font-latin text-[13px] italic tracking-wide text-ink-soft md:mt-3.5 md:text-[15px]">
           笔墨随心动 <span className="text-accent">❦</span> 纸上记光阴
         </div>
-        <div className="mx-auto mt-6 h-px w-30 bg-gradient-to-r from-transparent via-margin-line to-transparent" />
+        <div className="mx-auto mt-4 h-px w-24 bg-gradient-to-r from-transparent via-margin-line to-transparent md:mt-6 md:w-30" />
       </header>
 
       {/* 工具栏 */}
-      <div className="mx-auto flex max-w-[1100px] items-center justify-between px-10 pb-6">
-        <h2 className="flex items-center gap-2.5 font-latin text-2xl font-semibold text-ink">
+      <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-5 pb-3 md:px-10 md:pb-6">
+        <h2 className="flex items-center gap-2 font-latin text-lg font-semibold text-ink md:gap-2.5 md:text-2xl">
           <span className="text-gold">§</span>
           我的书架
-          <span className="ml-1.5 font-latin text-sm italic font-normal text-ink-faded">
+          <span className="hidden font-latin text-xs italic font-normal text-ink-faded sm:inline md:text-sm">
             · {journals.length} 卷 · {totalCount} 则
           </span>
         </h2>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
           {/* 用户头像：点击打开个人信息 */}
           {user && (
             <button
               onClick={() => setProfileOpen(true)}
               title="个人信息"
-              className="avatar-pulse flex h-9 w-9 items-center justify-center rounded-full font-cn text-[13px] font-medium text-paper transition-transform hover:scale-105"
+              className="avatar-pulse flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-cn text-[12px] font-medium text-paper transition-transform hover:scale-105 md:h-9 md:w-9 md:text-[13px]"
               style={{ background: 'linear-gradient(135deg, var(--accent), var(--gold))' }}
             >
               {initialsOf(user.name)}
             </button>
           )}
-          <button onClick={openModal} className="btn-ink">
-            <span className="font-latin text-[18px] leading-none">+</span> 新立一卷
+          <button onClick={openModal} className="btn-ink !px-3 !py-2 text-xs md:!px-5 md:!py-2.5 md:text-sm">
+            <span className="font-latin text-[16px] leading-none md:text-[18px]">+</span> 新立
           </button>
         </div>
       </div>
 
       {/* 书卡网格 */}
-      <main className="mx-auto grid max-w-[1100px] grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-x-9 gap-y-10 px-10 pb-20">
+      <main className="mx-auto grid max-w-[1100px] grid-cols-2 gap-3 px-5 pb-10 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-8 md:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] md:gap-x-9 md:gap-y-10 md:px-10 md:pb-20">
         {journals.length === 0 ? (
           <div className="col-span-full py-20 text-center text-ink-faded">
-            <div className="mb-5 font-latin text-[80px] text-margin-line">❦</div>
-            <h3 className="mb-2.5 font-latin text-2xl italic text-ink-soft">书架空空，静待第一卷</h3>
+            <div className="mb-5 font-latin text-[60px] text-margin-line md:text-[80px]">❦</div>
+            <h3 className="mb-2.5 font-latin text-xl italic text-ink-soft md:text-2xl">书架空空，静待第一卷</h3>
             <p className="font-serif text-sm leading-relaxed">
               点击右上角"新立一卷"，开启你的第一本日记。
             </p>
@@ -160,12 +160,12 @@ export default function BookshelfPage() {
                 <button
                   onClick={(e) => onDelete(b, e)}
                   title="删除此卷"
-                  className="absolute -right-2 -top-2 z-[5] flex h-[26px] w-[26px] items-center justify-center rounded-full border-2 border-paper bg-ink text-[14px] text-paper opacity-0 transition-all hover:scale-110 hover:bg-accent group-hover:opacity-100"
+                  className="absolute -right-1 -top-1 z-[5] flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 border-paper bg-ink text-[12px] text-paper opacity-0 transition-all hover:scale-110 hover:bg-accent group-hover:opacity-100 sm:-right-2 sm:-top-2 sm:h-[26px] sm:w-[26px] sm:text-[14px]"
                 >
                   ×
                 </button>
                 <div
-                  className="relative h-[300px] transition-transform duration-500 ease-out group-hover:-translate-y-2 group-hover:[transform:rotateY(-8deg)]"
+                  className="relative h-[180px] transition-transform duration-500 ease-out group-hover:-translate-y-2 group-hover:[transform:rotateY(-8deg)] sm:h-[240px] md:h-[300px]"
                   style={{ transformStyle: 'preserve-3d' }}
                 >
                   <BookCover journal={b} />
