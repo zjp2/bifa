@@ -5,6 +5,8 @@ import { uid } from '@/utils'
 import type { Chapter, Entry, Journal } from '@/types'
 
 const GUEST_DATA_KEY = 'inkwell_data_v3'
+const GUEST_DATA_VERSION_KEY = 'inkwell_data_version'
+const CURRENT_GUEST_VERSION = 2  // 每次更新 seedSample 时递增
 
 interface GuestData {
   journals: Journal[]
@@ -134,12 +136,12 @@ function seedSample(): Journal[] {
           entries: [
             {
               id: 'e1',
-              title: '雨后的清晨',
-              subtitle: 'after the rain',
+              title: '家人小聚',
+              subtitle: 'family gathering',
               date: now - 86400000,
-              tags: ['清晨', '雨', '随想'],
+              tags: ['家人', '聚餐', '温暖'],
               content:
-                '<p>清晨推窗，空气里满是湿润的泥土气息。檐角还滴着昨夜的雨，一滴、一滴，敲在青石板上，像是谁在数着时光的步子。</p><p>泡一壶龙井，看茶叶在杯中翻转沉浮，心也跟着静了下来。这样的早晨，宜读几页旧书，宜写几行字，宜什么都不做。</p><blockquote>雨后万物新，人心亦当如是。</blockquote>',
+                '<p>今天难得有空，和妹妹、奶奶一起吃了顿火锅。热腾腾的锅底翻滚着，就像我们之间的感情——朴实却热烈。</p><p><img src="/6c70174b-9abf-4b95-bb73-5f8594b1d101.jpg" alt="家人合影" style="width:100%;max-width:420px;border-radius:4px;margin:12px 0;" /></p><p>照片里，我穿着红色的上衣，妹妹坐在中间，奶奶在右边笑着。这样的时刻，值得被永远记住。愿时光慢些，再慢些，让这样的团聚多些，再多些。</p><blockquote>家，是温暖的港湾；亲情，是一生的牵绊。</blockquote>',
             },
             {
               id: 'e2',
@@ -236,6 +238,13 @@ export const useJournalStore = create<JournalState>((set, get) => ({
 
   init: async () => {
     if (isGuest()) {
+      // 版本检测：版本不匹配时重置示例数据
+      const savedVersion = Number(localStorage.getItem(GUEST_DATA_VERSION_KEY) || '0')
+      if (savedVersion !== CURRENT_GUEST_VERSION) {
+        localStorage.removeItem(GUEST_DATA_KEY)
+        localStorage.setItem(GUEST_DATA_VERSION_KEY, String(CURRENT_GUEST_VERSION))
+      }
+
       let data = readGuestData()
       if (data.journals.length === 0) {
         data = { journals: seedSample(), collapsedChapters: {} }

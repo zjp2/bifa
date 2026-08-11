@@ -7,8 +7,10 @@ import Modal from '@/components/Modal'
 import ProfileModal from '@/components/ProfileModal'
 import BookCover from '@/components/BookCover'
 import OpeningBookOverlay from '@/components/OpeningBookOverlay'
+import InspirationModal from '@/components/InspirationModal'
 import { BOOK_COLORS, type Journal } from '@/types'
 import { initialsOf } from '@/utils'
+import { getDailyQuote } from '@/data/quotes'
 
 export default function BookshelfPage() {
   const navigate = useNavigate()
@@ -20,16 +22,53 @@ export default function BookshelfPage() {
 
   const [modalOpen, setModalOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [inspirationOpen, setInspirationOpen] = useState(false)
   const [openingBook, setOpeningBook] = useState<{ journal: Journal; rect: DOMRect } | null>(null)
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [color, setColor] = useState(BOOK_COLORS[0].value)
   const [coverImage, setCoverImage] = useState<string | null>(null)
 
+  // 获取每日一言
+  const dailyQuote = useMemo(() => getDailyQuote(), [])
+
+  // 计算统计数据
+  const stats = useMemo(() => {
+    let totalEntries = 0
+    let totalWords = 0
+    let lastWriteDate = 0
+    const recentEntries: { title: string; date: number; journalId: string }[] = []
+
+    for (const j of journals) {
+      for (const c of j.chapters) {
+        for (const e of c.entries) {
+          totalEntries++
+          const text = e.content.replace(/<[^>]*>/g, '')
+          totalWords += text.length
+          if (typeof e.date === 'number' && e.date > lastWriteDate) {
+            lastWriteDate = e.date
+          }
+          recentEntries.push({
+            title: e.title || '无题',
+            date: typeof e.date === 'number' ? e.date : new Date(e.date).getTime(),
+            journalId: j.id,
+          })
+        }
+      }
+    }
+
+    // 按日期排序，取最近3条
+    recentEntries.sort((a, b) => b.date - a.date)
+    const recent = recentEntries.slice(0, 3)
+
+    // 计算连续写作天数
+    const streakDays = calculateStreak(recentEntries.map((e) => e.date))
+
+    return { totalEntries, totalWords, lastWriteDate, recent, streakDays }
+  }, [journals])
+
   // 进入时确保数据已加载
-  useEffect(() => {
-    // init 由 App 在登录后触发；此处仅兜底
-  }, [])
+  useEffect(() => {}, [])
 
   const openModal = () => {
     setName('')
@@ -73,10 +112,9 @@ export default function BookshelfPage() {
   }
 
   const onOpen = (b: Journal, e: React.MouseEvent) => {
-    if (openingBook) return // 防止动画期间重复点击
+    if (openingBook) return
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setOpeningBook({ journal: b, rect })
-    // 推近 0.45s + 停顿 0.08s + 翻开 0.75s ≈ 1.28s，在翻开快结束时导航
     window.setTimeout(() => {
       navigate(`/journal/${b.id}`)
     }, 1220)
@@ -86,6 +124,18 @@ export default function BookshelfPage() {
     () => journals.reduce((s, b) => s + b.chapters.reduce((c, ch) => c + ch.entries.length, 0), 0),
     [journals],
   )
+
+  // 格式化日期
+  const formatDate = (timestamp: number) => {
+    const d = new Date(timestamp)
+    const now = new Date()
+    const diff = now.getTime() - timestamp
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    if (days === 0) return '今日'
+    if (days === 1) return '昨日'
+    if (days < 7) return `${days}日前`
+    return `${d.getMonth() + 1}月${d.getDate()}日`
+  }
 
   return (
     <div
@@ -109,6 +159,89 @@ export default function BookshelfPage() {
         <div className="mx-auto mt-4 h-px w-24 bg-gradient-to-r from-transparent via-margin-line to-transparent md:mt-6 md:w-30" />
       </header>
 
+      {/* 今日仪表盘 */}
+      {journals.length > 0 && (
+        <section className="mx-auto max-w-[1100px] px-4 pb-6 md:px-10">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
+            {/* 每日一言 */}
+            <div className="animate-fadeIn rounded-book border border-margin-line bg-[rgba(255,251,240,0.7)] p-4 md:p-5">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="font-latin text-xs tracking-wider text-gold">❦</span>
+                <span className="font-latin text-[11px] italic uppercase tracking-[3px] text-ink-faded">
+                  每日一言
+                </span>
+              </div>
+              <p className="mb-2 font-cn text-[14px] leading-[1.8] text-ink md:text-[15px]">
+                {dailyQuote.text}
+              </p>
+              <p className="font-latin text-[11px] italic text-ink-faded">— {dailyQuote.author}</p>
+            </div>
+
+            {/* 写作统计 */}
+            <div className="animate-fadeIn rounded-book border border-margin-line bg-[rgba(255,251,240,0.7)] p-4 md:p-5" style={{ animationDelay: '0.1s' }}>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="font-latin text-xs tracking-wider text-gold">§</span>
+                <span className="font-latin text-[11px] italic uppercase tracking-[3px] text-ink-faded">
+                  写作统计
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center">
+                  <div className="font-latin text-xl font-semibold text-ink md:text-2xl">
+                    {stats.totalEntries}
+                  </div>
+                  <div className="font-cn text-[10px] text-ink-faded">则日记</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-latin text-xl font-semibold text-ink md:text-2xl">
+                    {stats.streakDays}
+                  </div>
+                  <div className="font-cn text-[10px] text-ink-faded">日连续</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-latin text-xl font-semibold text-ink md:text-2xl">
+                    {stats.totalWords > 9999 ? `${Math.floor(stats.totalWords / 1000)}k` : stats.totalWords}
+                  </div>
+                  <div className="font-cn text-[10px] text-ink-faded">字成文</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 最近日记 */}
+            <div className="animate-fadeIn rounded-book border border-margin-line bg-[rgba(255,251,240,0.7)] p-4 md:p-5" style={{ animationDelay: '0.2s' }}>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="font-latin text-xs tracking-wider text-gold">·</span>
+                <span className="font-latin text-[11px] italic uppercase tracking-[3px] text-ink-faded">
+                  近日所记
+                </span>
+              </div>
+              {stats.recent.length > 0 ? (
+                <div className="space-y-2">
+                  {stats.recent.map((e, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        navigate(`/journal/${e.journalId}`)
+                      }}
+                      className="flex w-full items-center justify-between gap-2 rounded-book px-2 py-1.5 text-left transition-colors hover:bg-[rgba(154,123,58,0.08)]"
+                    >
+                      <span className="truncate font-cn text-[13px] text-ink-soft">
+                        {e.title}
+                      </span>
+                      <span className="shrink-0 font-latin text-[10px] italic text-ink-faded">
+                        {formatDate(e.date)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-serif text-[13px] italic text-ink-faded">尚未落笔，静待第一篇</p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 工具栏 */}
       <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-3 px-5 pb-3 md:px-10 md:pb-6">
         <h2 className="flex items-center gap-2 font-latin text-lg font-semibold text-ink md:gap-2.5 md:text-2xl">
@@ -120,7 +253,15 @@ export default function BookshelfPage() {
         </h2>
 
         <div className="flex shrink-0 items-center gap-2 md:gap-3">
-          {/* 用户头像：点击打开个人信息 */}
+          {/* 灵感阁入口 */}
+          <button
+            onClick={() => setInspirationOpen(true)}
+            title="灵感阁"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gold bg-[rgba(154,123,58,0.15)] text-gold transition-all hover:scale-105 hover:bg-[rgba(154,123,58,0.3)] md:h-9 md:w-9"
+          >
+            <span className="text-sm md:text-base">✦</span>
+          </button>
+          {/* 用户头像 */}
           {user && (
             <button
               onClick={() => setProfileOpen(true)}
@@ -140,12 +281,23 @@ export default function BookshelfPage() {
       {/* 书卡网格 */}
       <main className="mx-auto grid max-w-[1100px] grid-cols-2 gap-3 px-5 pb-10 sm:grid-cols-3 sm:gap-x-6 sm:gap-y-8 md:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] md:gap-x-9 md:gap-y-10 md:px-10 md:pb-20">
         {journals.length === 0 ? (
-          <div className="col-span-full py-20 text-center text-ink-faded">
-            <div className="mb-5 font-latin text-[60px] text-margin-line md:text-[80px]">❦</div>
-            <h3 className="mb-2.5 font-latin text-xl italic text-ink-soft md:text-2xl">书架空空，静待第一卷</h3>
-            <p className="font-serif text-sm leading-relaxed">
-              点击右上角"新立一卷"，开启你的第一本日记。
-            </p>
+          <div className="col-span-full py-10 text-center text-ink-faded">
+            {/* 空状态 - 更丰富的引导 */}
+            <div className="mb-6 animate-fadeIn">
+              <div className="mb-3 font-latin text-[60px] text-margin-line md:text-[80px]">❦</div>
+              <h3 className="mb-2.5 font-latin text-xl italic text-ink-soft md:text-2xl">书架空空，静待第一卷</h3>
+              <p className="mx-auto max-w-[280px] font-serif text-sm leading-relaxed">
+                笔墨纸砚已备，只欠你的第一篇文字
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-3">
+              <button onClick={openModal} className="btn-ink">
+                <span className="font-latin text-[16px]">+</span> 立第一卷
+              </button>
+              <button onClick={() => setInspirationOpen(true)} className="btn-ghost">
+                <span className="text-gold">✦</span> 前往灵感阁
+              </button>
+            </div>
           </div>
         ) : (
           journals.map((b, idx) => {
@@ -277,10 +429,40 @@ export default function BookshelfPage() {
       {/* 个人信息弹层 */}
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
-      {/* 书翻开浮层：镜头推近 + 翻开封面 */}
+      {/* 灵感阁弹层 */}
+      <InspirationModal open={inspirationOpen} onClose={() => setInspirationOpen(false)} />
+
+      {/* 书翻开浮层 */}
       {openingBook && (
         <OpeningBookOverlay journal={openingBook.journal} startRect={openingBook.rect} />
       )}
     </div>
   )
+}
+
+/** 计算连续写作天数 */
+function calculateStreak(dates: number[]): number {
+  if (dates.length === 0) return 0
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todayTime = today.getTime()
+
+  // 将所有日期按天分组（去重）
+  const daySet = new Set<string>()
+  for (const d of dates) {
+    const date = new Date(d)
+    date.setHours(0, 0, 0, 0)
+    daySet.add(date.getTime().toString())
+  }
+
+  let streak = 0
+  let currentDay = todayTime
+
+  while (daySet.has(currentDay.toString())) {
+    streak++
+    currentDay -= 24 * 60 * 60 * 1000
+  }
+
+  return streak
 }
