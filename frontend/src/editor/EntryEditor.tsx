@@ -45,8 +45,8 @@ export default function EntryEditor({ entry, chapter }: Props) {
   const [date, setDate] = useState<number>(
     typeof entry.date === 'string' ? new Date(entry.date).getTime() : entry.date,
   )
-  const [tags, setTags] = useState<string[]>(entry.tags ?? [])
-  const [tagInput, setTagInput] = useState('')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [tags, _setTags] = useState<string[]>(entry.tags ?? [])
 
   // 图片 / 代码弹层
   const [imgOpen, setImgOpen] = useState(false)
@@ -63,7 +63,8 @@ export default function EntryEditor({ entry, chapter }: Props) {
   // 图片选中 & 拖拽调整尺寸
   const [selectedImg, setSelectedImg] = useState<HTMLImageElement | null>(null)
   const [imgWrapperStyle, setImgWrapperStyle] = useState<React.CSSProperties | null>(null)
-  const [imgFloat, setImgFloat] = useState<'none' | 'left' | 'right'>('none')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_imgFloat, setImgFloat] = useState<'none' | 'left' | 'right'>('none')
   const resizeDragRef = useRef<{
     startX: number
     startY: number
@@ -109,6 +110,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
       attributes: {
         class: 'ink-editor ProseMirror',
         'data-placeholder': '此处落墨，记录此刻心绪……',
+        'style': '-webkit-touch-callout: none; -webkit-user-select: text; user-select: text;',
       },
     },
     onUpdate: () => scheduleRef.current(800),
@@ -201,6 +203,55 @@ export default function EntryEditor({ entry, chapter }: Props) {
       }
     }
   }, [entry.id, updateEntry])
+
+  // 移动端：彻底阻止系统选择菜单
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android|HarmonyOS/i.test(navigator.userAgent) || 'ontouchstart' in window
+
+    if (!isMobile || !editor) return
+
+    const view = editor.view.dom
+
+    // 1. 阻止 contextmenu
+    const onContextMenu = (e: Event) => e.preventDefault()
+    view.addEventListener('contextmenu', onContextMenu)
+
+    // 2. 监听 selectionchange，选择发生后立即清除系统选择
+    // 让系统菜单无内容可显示，Tiptap BubbleMenu 接管
+    const onSelectionChange = () => {
+      const sel = window.getSelection()
+      if (sel && sel.rangeCount > 0) {
+        const anchor = sel.anchorNode
+        if (anchor && view.contains(anchor)) {
+          // 用 requestAnimationFrame 延迟清除
+          requestAnimationFrame(() => {
+            const currentSel = window.getSelection()
+            if (currentSel && currentSel.anchorNode === anchor) {
+              currentSel.removeAllRanges()
+            }
+          })
+        }
+      }
+    }
+    document.addEventListener('selectionchange', onSelectionChange)
+
+    // 3. 触摸事件：手指抬起后清除选择
+    const onTouchEnd = () => {
+      setTimeout(() => {
+        const sel = window.getSelection()
+        if (sel && sel.rangeCount > 0) {
+          sel.removeAllRanges()
+        }
+      }, 30)
+    }
+    view.addEventListener('touchend', onTouchEnd, { passive: true })
+
+    return () => {
+      view.removeEventListener('contextmenu', onContextMenu)
+      view.removeEventListener('touchend', onTouchEnd)
+      document.removeEventListener('selectionchange', onSelectionChange)
+    }
+  }, [editor])
 
   // Ctrl/⌘ + S 手动存稿
   useEffect(() => {
@@ -411,18 +462,6 @@ export default function EntryEditor({ entry, chapter }: Props) {
           : `${corner}-resize`
   }
 
-  // 拖拽移动图片到左/右侧 → 切换 float
-  // 在选中图片上 mousedown（非手柄区域）时启动
-  const startMoveImg = (e: React.MouseEvent) => {
-    if (!selectedImg || !editor) return
-    const el = editor.view.dom as HTMLElement
-    moveDragRef.current = {
-      startX: e.clientX,
-      img: selectedImg,
-      editorRect: el.getBoundingClientRect(),
-    }
-  }
-
   // 拖拽移动：全局 mousemove 检测方向
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
@@ -463,7 +502,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
       const target = e.target as HTMLElement
       if (target.tagName === 'IMG') {
         const img = target as HTMLImageElement
-        // 同一图片被再次点击（已选中）→ 打开灯箱
+        // 同一图片被再次点击（已选中）→ 打开灯箱查看大图
         if (img === selectedImg) {
           setLightboxSrc(img.src)
           return
@@ -501,18 +540,6 @@ export default function EntryEditor({ entry, chapter }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entry.id])
 
-  /* ---------- 标签 ---------- */
-  const addTag = (val: string) => {
-    const v = val.trim()
-    if (!v || tags.includes(v)) return
-    setTags([...tags, v])
-    scheduleSave()
-  }
-  const removeTag = (i: number) => {
-    setTags(tags.filter((_, idx) => idx !== i))
-    scheduleSave()
-  }
-
   /* ---------- 图片 ---------- */
   const openImgModal = () => {
     setImgData(null)
@@ -535,10 +562,23 @@ export default function EntryEditor({ entry, chapter }: Props) {
       toast('请先选取图像')
       return
     }
+    // 确保在光标位置插入新图片，而不是替换已有图片
+    // 使用 setImage 时，如果光标不在图片上，会在光标位置插入
     editor?.chain().focus().setImage({ src: imgData, alt: imgCaption || 'illustration' }).run()
     setImgOpen(false)
     scheduleSave()
     toast('已嵌入图像')
+  }
+
+  // 删除选中的图片
+  const deleteSelectedImg = () => {
+    if (!selectedImg || !editor) return
+    const pos = editor.view.posAtDOM(selectedImg, 0)
+    if (pos == null) return
+    editor.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run()
+    setSelectedImg(null)
+    scheduleSave()
+    toast('已删除图像')
   }
 
   /* ---------- 代码 ---------- */
@@ -631,244 +671,177 @@ export default function EntryEditor({ entry, chapter }: Props) {
         className="mb-5 w-full border-none bg-transparent text-center font-latin text-base italic text-ink-faded outline-none"
       />
 
-      {/* 标签栏 */}
-      <div className="mb-7 flex min-h-[50px] flex-wrap items-center gap-2 rounded-book border border-dashed border-margin-line bg-[rgba(154,123,58,0.06)] px-4 py-3.5">
-        <span className="mr-1 font-latin text-xs uppercase tracking-[2px] text-ink-faded">
-          标 · Marks
-        </span>
-        {tags.map((t, i) => (
-          <span
-            key={`${t}-${i}`}
-            className="inline-flex items-center gap-1.5 rounded-book bg-accent px-2.5 py-1 font-cn text-xs text-paper shadow-[1px_1px_0_rgba(0,0,0,0.15)]"
-            style={{ animation: 'tagIn 0.3s ease' }}
-          >
-            {t}
-            <button
-              type="button"
-              onClick={() => removeTag(i)}
-              className="text-[14px] leading-none opacity-70 transition-opacity hover:opacity-100 hover:text-gold"
-            >
-              ×
-            </button>
-          </span>
-        ))}
-        <input
-          type="text"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ',') {
-              e.preventDefault()
-              addTag(tagInput)
-              setTagInput('')
-            } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
-              removeTag(tags.length - 1)
-            }
-          }}
-          placeholder="添加标记后回车…"
-          className="min-w-[80px] flex-1 border-none bg-transparent font-cn text-[13px] text-ink outline-none placeholder:font-latin placeholder:italic placeholder:text-ink-faded"
-        />
-      </div>
-
       {/* Tiptap 编辑器 */}
       <div className="relative">
         <EditorContent editor={editor} />
-        {/* 图片选中手柄覆盖层：跟随图片位置 */}
-        {imgWrapperStyle && selectedImg && (
-          <div
-            style={{
-              ...imgWrapperStyle,
-              pointerEvents: 'none',
-              zIndex: 40,
-            }}
-            className="img-resize-overlay"
-            onMouseDown={startMoveImg}
-          >
-            {/* 描边选中框 */}
-            <div className="absolute inset-0 border-2 border-accent box-border pointer-events-none" />
-            {/* 四角手柄 */}
-            {(['nw', 'ne', 'sw', 'se'] as const).map((c) => (
-              <span
-                key={c}
-                onMouseDown={startResize(c)}
-                className={`img-resize-handle corner-${c}`}
-              />
-            ))}
-            {/* 四边手柄 */}
-            {(['n', 's', 'e', 'w'] as const).map((c) => (
-              <span
-                key={c}
-                onMouseDown={startResize(c)}
-                className={`img-resize-handle side-${c}`}
-              />
-            ))}
-            {/* 浮动对齐按钮组：显示在选中框上方 */}
-            <div
-              className="absolute left-1/2 -top-9 flex -translate-x-1/2 items-center gap-0.5 rounded-book border border-accent bg-paper px-1 py-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
-              style={{ pointerEvents: 'auto' }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {([
-                { v: 'left', icon: '⇤', label: '左浮' },
-                { v: 'none', icon: '⇔', label: '居中' },
-                { v: 'right', icon: '⇥', label: '右浮' },
-              ] as const).map((btn) => (
-                <button
-                  key={btn.v}
-                  type="button"
-                  title={btn.label}
-                  onClick={() => setFloatForSelectedImg(btn.v)}
-                  className={`flex h-6 w-7 items-center justify-center rounded-[3px] text-[14px] transition-colors ${
-                    imgFloat === btn.v
-                      ? 'bg-accent text-paper'
-                      : 'text-ink-soft hover:bg-paper-deep'
-                  }`}
-                >
-                  {btn.icon}
-                </button>
-              ))}
-            </div>
-            {/* 拖拽提示 */}
-            <div
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none rounded-book bg-[rgba(138,47,31,0.85)] px-2 py-1 font-cn text-[11px] text-paper opacity-0 transition-opacity"
-              style={{ pointerEvents: 'none' }}
-            >
-              拖拽至左右侧浮动
-            </div>
-          </div>
-        )}
+        <BubbleToolbar editor={editor} />
       </div>
 
-      {/* 气泡 + 底部工具条 */}
-      <BubbleToolbar editor={editor} />
+      {/* 底部工具栏 */}
       <BottomToolbar
-        editor={editor}
         onInsertImage={openImgModal}
         onInsertCode={openCodeModal}
         onSave={() => flushSave(false)}
+        editor={editor}
       />
 
-      {/* 插图弹层 */}
-      <Modal
-        open={imgOpen}
-        onClose={() => setImgOpen(false)}
-        title="插入一图"
-        subtitle="— An Illustration —"
-        widthClass="max-w-[520px]"
-      >
-        <div className="mb-3.5 flex min-h-[140px] items-center justify-center overflow-hidden rounded-[4px] border-2 border-dashed border-margin-line bg-[rgba(255,251,240,0.5)] font-latin italic text-ink-faded">
-          {imgData ? (
-            <img src={imgData} alt="preview" className="max-h-[240px] max-w-full" />
-          ) : (
-            <div className="px-7 py-7 text-center">选取图像后预览于此</div>
-          )}
-        </div>
-        <div className="relative mb-3.5">
-          <label className="block cursor-pointer rounded-book border border-margin-line bg-paper-deep px-3 py-3 text-center font-cn text-[13px] text-ink-soft transition-colors hover:bg-paper-shadow hover:text-ink">
-            选取图像
-            <input type="file" accept="image/*" onChange={onImgFile} className="hidden" />
-          </label>
-        </div>
-        <div className="mb-2">
-          <label className="modal-label">图注（可选）</label>
+      {/* 图片弹层 */}
+      <Modal open={imgOpen} onClose={() => setImgOpen(false)} title="嵌入图像">
+        <div className="space-y-4">
+          <div className="flex flex-col items-center gap-3">
+            {imgData ? (
+              <img src={imgData} alt="预览" className="max-h-48 rounded border border-margin-line" />
+            ) : (
+              <div className="flex h-32 w-48 items-center justify-center rounded border-2 border-dashed border-margin-line text-ink-faded">
+                图像预览
+              </div>
+            )}
+            <label className="cursor-pointer rounded-book bg-[rgba(138,47,31,0.08)] px-4 py-2 text-sm text-accent hover:bg-[rgba(138,47,31,0.12)]">
+              选取图像
+              <input type="file" accept="image/*" className="hidden" onChange={onImgFile} />
+            </label>
+          </div>
           <input
             type="text"
             value={imgCaption}
             onChange={(e) => setImgCaption(e.target.value)}
-            placeholder="例如：晨光中的窗台"
-            className="modal-input"
+            placeholder="添加图注（可选）"
+            className="w-full rounded border border-margin-line bg-paper px-3 py-2 text-sm outline-none focus:border-accent"
           />
-        </div>
-        <div className="mt-6 flex justify-end gap-2.5">
-          <button onClick={() => setImgOpen(false)} className="btn-ghost">
-            取消
-          </button>
-          <button onClick={confirmImg} className="btn-ink">
-            嵌入
-          </button>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setImgOpen(false)}
+              className="rounded px-4 py-2 text-sm text-ink-faded hover:bg-margin-line"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={confirmImg}
+              className="rounded-book bg-accent px-4 py-2 text-sm text-paper hover:opacity-90"
+            >
+              嵌入
+            </button>
+          </div>
         </div>
       </Modal>
 
       {/* 代码弹层 */}
-      <Modal
-        open={codeOpen}
-        onClose={() => setCodeOpen(false)}
-        title="嵌入代码"
-        subtitle="— A Code Snippet —"
-        widthClass="max-w-[560px]"
-      >
-        <div className="mb-4">
-          <label className="modal-label">类型</label>
-          <div className="flex gap-1.5 rounded-md border border-margin-line bg-paper-deep p-1">
-            <button
-              type="button"
-              onClick={() => setCodeType('block')}
-              className={`flex-1 rounded-[4px] px-2 py-2 font-cn text-[13px] tracking-wider transition-all ${
-                codeType === 'block'
-                  ? 'bg-paper text-ink shadow-[0_1px_4px_rgba(0,0,0,0.12)]'
-                  : 'text-ink-faded hover:text-ink-soft'
-              }`}
-            >
-              代码块
-            </button>
-            <button
-              type="button"
-              onClick={() => setCodeType('inline')}
-              className={`flex-1 rounded-[4px] px-2 py-2 font-cn text-[13px] tracking-wider transition-all ${
-                codeType === 'inline'
-                  ? 'bg-paper text-ink shadow-[0_1px_4px_rgba(0,0,0,0.12)]'
-                  : 'text-ink-faded hover:text-ink-soft'
-              }`}
-            >
-              行内代码
-            </button>
-          </div>
-        </div>
-        {codeType === 'block' && (
-          <div className="mb-4">
-            <label className="modal-label">语言（可选）</label>
+      <Modal open={codeOpen} onClose={() => setCodeOpen(false)} title={codeType === 'inline' ? '行内代码' : '代码块'}>
+        <div className="space-y-4">
+          {codeType === 'block' && (
             <input
               type="text"
               value={codeLang}
               onChange={(e) => setCodeLang(e.target.value)}
-              placeholder="例如：javascript、python、sql"
-              className="modal-input"
+              placeholder="语言（可选，如 javascript）"
+              className="w-full rounded border border-margin-line bg-paper px-3 py-2 text-sm outline-none focus:border-accent"
             />
-          </div>
-        )}
-        <div className="mb-2">
-          <label className="modal-label">代码内容</label>
+          )}
           <textarea
             value={codeContent}
             onChange={(e) => setCodeContent(e.target.value)}
-            placeholder="粘贴或输入代码……"
-            rows={8}
-            className="min-h-[160px] w-full resize-y rounded-[4px] border border-shelf bg-[#2a1d12] px-3.5 py-3 font-mono text-[13px] leading-relaxed text-[#e8dcc4] outline-none placeholder:italic placeholder:text-[#8a7a60] focus:border-accent focus:shadow-[0_0_0_2px_rgba(138,47,31,0.15)]"
-            style={{ whiteSpace: 'pre' }}
+            placeholder={codeType === 'inline' ? '输入行内代码…' : '输入代码块内容…'}
+            rows={codeType === 'inline' ? 2 : 8}
+            className="w-full rounded border border-margin-line bg-paper px-3 py-2 font-mono text-sm outline-none focus:border-accent"
           />
-        </div>
-        <div className="mt-6 flex justify-end gap-2.5">
-          <button onClick={() => setCodeOpen(false)} className="btn-ghost">
-            取消
-          </button>
-          <button onClick={confirmCode} className="btn-ink">
-            嵌入
-          </button>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setCodeOpen(false)}
+              className="rounded px-4 py-2 text-sm text-ink-faded hover:bg-margin-line"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={confirmCode}
+              className="rounded-book bg-accent px-4 py-2 text-sm text-paper hover:opacity-90"
+            >
+              嵌入
+            </button>
+          </div>
         </div>
       </Modal>
 
       {/* 灯箱 */}
       {lightboxSrc && (
         <div
-          className="fixed inset-0 z-[300] flex cursor-zoom-out items-center justify-center p-10"
-          style={{ background: 'rgba(20,12,6,0.92)' }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
           onClick={() => setLightboxSrc(null)}
         >
-          <img
-            src={lightboxSrc}
-            alt=""
-            className="max-h-[90%] max-w-[90%] border-8 border-paper shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
-          />
+          <img src={lightboxSrc} alt="预览" className="max-h-full max-w-full rounded" />
+          <button
+            type="button"
+            onClick={() => setLightboxSrc(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/30"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* 选中图片的调整手柄容器 */}
+      {selectedImg && imgWrapperStyle && (
+        <div
+          className="pointer-events-auto absolute z-10"
+          style={{
+            left: imgWrapperStyle.left,
+            top: imgWrapperStyle.top,
+            width: imgWrapperStyle.width,
+            height: imgWrapperStyle.height,
+          }}
+        >
+          {/* 边框 */}
+          <div className="pointer-events-none absolute inset-0 rounded border-2 border-accent/60" />
+          {/* 删除按钮 */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation()
+              deleteSelectedImg()
+            }}
+            className="absolute -right-3 -top-3 flex h-7 w-7 items-center justify-center rounded-full border-2 border-red-500 bg-paper text-red-500 shadow-md hover:bg-red-500 hover:text-white transition-colors"
+            title="删除图片"
+          >
+            ✕
+          </button>
+          {/* 四角手柄 */}
+          {(['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
+            <div
+              key={corner}
+              onMouseDown={startResize(corner)}
+              className="absolute h-3 w-3 cursor-nwse-resize rounded-full border-2 border-accent bg-paper"
+              style={{
+                left: corner.includes('w') ? -6 : undefined,
+                right: corner.includes('e') ? -6 : undefined,
+                top: corner.includes('n') ? -6 : undefined,
+                bottom: corner.includes('s') ? -6 : undefined,
+                cursor:
+                  corner === 'nw' || corner === 'se'
+                    ? 'nwse-resize'
+                    : 'nesw-resize',
+              }}
+            />
+          ))}
+          {/* 四边手柄（用于单方向调整） */}
+          {(['n', 's', 'e', 'w'] as const).map((corner) => (
+            <div
+              key={corner}
+              onMouseDown={startResize(corner)}
+              className="absolute h-2 w-2 rounded-full border border-accent bg-paper"
+              style={{
+                left: corner === 'w' ? -4 : corner === 'e' ? undefined : '50%',
+                right: corner === 'e' ? -4 : undefined,
+                top: corner === 'n' ? -4 : corner === 's' ? undefined : '50%',
+                bottom: corner === 's' ? -4 : undefined,
+                transform: corner === 'n' || corner === 's' ? 'translateX(-50%)' : 'translateY(-50%)',
+                cursor: corner === 'n' || corner === 's' ? 'ns-resize' : 'ew-resize',
+              }}
+            />
+          ))}
         </div>
       )}
     </div>
