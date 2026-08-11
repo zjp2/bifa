@@ -1,7 +1,9 @@
 import { type Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react/menus'
+import { useUIStore } from '@/store/uiStore'
 import {
   IconCode,
+  IconCopy,
   IconHighlight,
   IconH3,
   IconQuote,
@@ -15,7 +17,24 @@ interface Props {
 
 /** 选中文本浮出的气泡工具条 */
 export default function BubbleToolbar({ editor }: Props) {
+  const toast = useUIStore((s) => s.toast)
+
   if (!editor) return null
+
+  /** 复制选中文字 */
+  const handleCopy = () => {
+    const text = editor.state.doc.textBetween(
+      editor.state.selection.from,
+      editor.state.selection.to,
+      '\n',
+    )
+    if (text) {
+      navigator.clipboard.writeText(text).then(() => {
+        toast('已复制到剪贴板')
+      })
+    }
+  }
+
   return (
     <BubbleMenu
       editor={editor}
@@ -96,6 +115,15 @@ export default function BubbleToolbar({ editor }: Props) {
         title="转为引言"
       >
         <IconQuote />
+      </button>
+      <span className="ink-bubble-sep" />
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="ink-bubble-btn"
+        title="复制选中文本"
+      >
+        <IconCopy />
       </button>
     </BubbleMenu>
   )

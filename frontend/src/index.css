@@ -348,6 +348,26 @@ textarea {
   line-height: 2;
   color: var(--ink);
   outline: none;
+
+  /* 移动端：禁用系统长按菜单，避免覆盖自定义气泡工具栏 */
+  -webkit-touch-callout: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 移动端（触屏设备）进一步禁用系统选择UI */
+@media (hover: none) {
+  .ink-editor.ProseMirror {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .ink-editor.ProseMirror ::selection {
+    background: rgba(154, 123, 58, 0.35);
+    -webkit-text-fill-color: inherit;
+  }
+  .ink-editor.ProseMirror ::-moz-selection {
+    background: rgba(154, 123, 58, 0.35);
+  }
 }
 .ink-editor.ProseMirror-focused {
   outline: none;
