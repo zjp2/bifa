@@ -6,6 +6,7 @@ import {
   IconCopy,
   IconHighlight,
   IconH3,
+  IconPaste,
   IconQuote,
   IconRedMark,
   IconStrike,
@@ -32,6 +33,21 @@ export default function BubbleToolbar({ editor }: Props) {
       navigator.clipboard.writeText(text).then(() => {
         toast('已复制到剪贴板')
       })
+    }
+  }
+
+  /** 粘贴剪贴板内容 */
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text) {
+        editor.chain().focus().insertContent(text).run()
+        toast('已粘贴')
+      } else {
+        toast('剪贴板为空')
+      }
+    } catch {
+      toast('无法读取剪贴板')
     }
   }
 
@@ -124,6 +140,14 @@ export default function BubbleToolbar({ editor }: Props) {
         title="复制选中文本"
       >
         <IconCopy />
+      </button>
+      <button
+        type="button"
+        onClick={handlePaste}
+        className="ink-bubble-btn"
+        title="粘贴剪贴板内容"
+      >
+        <IconPaste />
       </button>
     </BubbleMenu>
   )

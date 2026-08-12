@@ -207,7 +207,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
     }
   }, [entry.id, updateEntry])
 
-  // 移动端：阻止长按弹出系统选择菜单；长按图片时自动选中
+  // 移动端：长按图片时自动选中；文本长按保留选区以触发 BubbleToolbar
   useEffect(() => {
     const isMobile = /iPhone|iPad|iPod|Android|HarmonyOS/i.test(navigator.userAgent) || 'ontouchstart' in window
 
@@ -219,45 +219,36 @@ export default function EntryEditor({ entry, chapter }: Props) {
     const onContextMenu = (e: Event) => e.preventDefault()
     view.addEventListener('contextmenu', onContextMenu)
 
-    // 2. 检测长按，阻止系统选择菜单
-    //    如果长按目标是图片，则自动选中并显示删除按钮
+    // 2. 检测长按：图片长按 → 自动选中图片；文本长按 → 保留选区让 BubbleToolbar 显示
     let longPressTimer: ReturnType<typeof setTimeout> | null = null
     let startX = 0, startY = 0
     let didMove = false
     let targetImg: HTMLImageElement | null = null
 
     const onTouchStart = (e: TouchEvent) => {
-      // 只处理单指操作
       if (e.touches.length > 1) return
       startX = e.touches[0].clientX
       startY = e.touches[0].clientY
       didMove = false
-      // 检查触摸目标是否是图片
       const target = e.target as HTMLElement
       targetImg = target.tagName === 'IMG' ? (target as HTMLImageElement) : null
 
-      // 500ms 后如果还没移动，阻止长按菜单
       longPressTimer = setTimeout(() => {
-        if (!didMove) {
-          // 阻止系统选择菜单
+        if (!didMove && targetImg) {
+          // 仅在长按图片时清空文本选区，避免冲突
           const sel = window.getSelection()
           if (sel && sel.rangeCount > 0) {
             sel.removeAllRanges()
           }
-          // 如果长按的是图片，自动选中
-          if (targetImg) {
-            // 移除所有选中状态
-            view.querySelectorAll('img.img-selected').forEach((i) => i.classList.remove('img-selected'))
-            targetImg.classList.add('img-selected')
-            setSelectedImg(targetImg)
-            // 读取当前 float 值
-            const cls = targetImg.className || ''
-            if (cls.includes('img-float-left')) setImgFloat('left')
-            else if (cls.includes('img-float-right')) setImgFloat('right')
-            else setImgFloat('none')
-          }
+          view.querySelectorAll('img.img-selected').forEach((i) => i.classList.remove('img-selected'))
+          targetImg.classList.add('img-selected')
+          setSelectedImg(targetImg)
+          const cls = targetImg.className || ''
+          if (cls.includes('img-float-left')) setImgFloat('left')
+          else if (cls.includes('img-float-right')) setImgFloat('right')
+          else setImgFloat('none')
         }
-      }, 500)
+      }, 400)
     }
 
     const onTouchMove = (e: TouchEvent) => {

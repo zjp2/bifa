@@ -58,6 +58,12 @@ export const IconCopy = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
+export const IconPaste = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M19 20H5V4h2v3h10V4h2v16zm-9-2h4v-2h-4v2zm4-4h-4v-2h4v2zM12 2a2 2 0 0 0-2 2h2V2z" />
+  </svg>
+)
+
 export const IconH3 = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
     <path d="M5 4v3h5.5v12h3V7H19V4z" />
