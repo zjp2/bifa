@@ -18,7 +18,12 @@ interface Props {
 }
 
 /** 编辑器底部工具条 */
-export default function BottomToolbar({ editor, onInsertImage, onInsertCode, onSave }: Props) {
+export default function BottomToolbar({
+  editor,
+  onInsertImage,
+  onInsertCode,
+  onSave,
+}: Props) {
   if (!editor) return null
   return (
     <div className="sticky bottom-0 left-0 right-0 z-[5] flex justify-center gap-1.5 bg-gradient-to-t from-paper-deep via-paper-deep/80 to-transparent px-0 pb-5 pt-8">

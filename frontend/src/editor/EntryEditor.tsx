@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -59,6 +59,9 @@ export default function EntryEditor({ entry, chapter }: Props) {
 
   // 灯箱
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+
+  // 编辑器容器（用于图片调整框定位参照）
+  const editorContainerRef = useRef<HTMLDivElement>(null)
 
   // 图片选中 & 拖拽调整尺寸
   const [selectedImg, setSelectedImg] = useState<HTMLImageElement | null>(null)
@@ -204,7 +207,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
     }
   }, [entry.id, updateEntry])
 
-  // 移动端：彻底阻止系统选择菜单
+  // 移动端：阻止长按弹出系统选择菜单；长按图片时自动选中
   useEffect(() => {
     const isMobile = /iPhone|iPad|iPod|Android|HarmonyOS/i.test(navigator.userAgent) || 'ontouchstart' in window
 
@@ -212,67 +215,117 @@ export default function EntryEditor({ entry, chapter }: Props) {
 
     const view = editor.view.dom
 
-    // 1. 阻止 contextmenu
+    // 1. 阻止 contextmenu（长按菜单）
     const onContextMenu = (e: Event) => e.preventDefault()
     view.addEventListener('contextmenu', onContextMenu)
 
-    // 2. 监听 selectionchange，选择发生后立即清除系统选择
-    // 让系统菜单无内容可显示，Tiptap BubbleMenu 接管
-    const onSelectionChange = () => {
-      const sel = window.getSelection()
-      if (sel && sel.rangeCount > 0) {
-        const anchor = sel.anchorNode
-        if (anchor && view.contains(anchor)) {
-          // 用 requestAnimationFrame 延迟清除
-          requestAnimationFrame(() => {
-            const currentSel = window.getSelection()
-            if (currentSel && currentSel.anchorNode === anchor) {
-              currentSel.removeAllRanges()
-            }
-          })
+    // 2. 检测长按，阻止系统选择菜单
+    //    如果长按目标是图片，则自动选中并显示删除按钮
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null
+    let startX = 0, startY = 0
+    let didMove = false
+    let targetImg: HTMLImageElement | null = null
+
+    const onTouchStart = (e: TouchEvent) => {
+      // 只处理单指操作
+      if (e.touches.length > 1) return
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+      didMove = false
+      // 检查触摸目标是否是图片
+      const target = e.target as HTMLElement
+      targetImg = target.tagName === 'IMG' ? (target as HTMLImageElement) : null
+
+      // 500ms 后如果还没移动，阻止长按菜单
+      longPressTimer = setTimeout(() => {
+        if (!didMove) {
+          // 阻止系统选择菜单
+          const sel = window.getSelection()
+          if (sel && sel.rangeCount > 0) {
+            sel.removeAllRanges()
+          }
+          // 如果长按的是图片，自动选中
+          if (targetImg) {
+            // 移除所有选中状态
+            view.querySelectorAll('img.img-selected').forEach((i) => i.classList.remove('img-selected'))
+            targetImg.classList.add('img-selected')
+            setSelectedImg(targetImg)
+            // 读取当前 float 值
+            const cls = targetImg.className || ''
+            if (cls.includes('img-float-left')) setImgFloat('left')
+            else if (cls.includes('img-float-right')) setImgFloat('right')
+            else setImgFloat('none')
+          }
+        }
+      }, 500)
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (longPressTimer) {
+        const dx = Math.abs(e.touches[0].clientX - startX)
+        const dy = Math.abs(e.touches[0].clientY - startY)
+        if (dx > 8 || dy > 8) {
+          didMove = true
+          clearTimeout(longPressTimer)
+          longPressTimer = null
         }
       }
     }
-    document.addEventListener('selectionchange', onSelectionChange)
 
-    // 3. 触摸事件：手指抬起后清除选择
     const onTouchEnd = () => {
-      setTimeout(() => {
-        const sel = window.getSelection()
-        if (sel && sel.rangeCount > 0) {
-          sel.removeAllRanges()
-        }
-      }, 30)
+      if (longPressTimer) {
+        clearTimeout(longPressTimer)
+        longPressTimer = null
+      }
+      targetImg = null
     }
+
+    view.addEventListener('touchstart', onTouchStart, { passive: true })
+    view.addEventListener('touchmove', onTouchMove, { passive: true })
     view.addEventListener('touchend', onTouchEnd, { passive: true })
+    view.addEventListener('touchcancel', onTouchEnd, { passive: true })
 
     return () => {
       view.removeEventListener('contextmenu', onContextMenu)
+      view.removeEventListener('touchstart', onTouchStart)
+      view.removeEventListener('touchmove', onTouchMove)
       view.removeEventListener('touchend', onTouchEnd)
-      document.removeEventListener('selectionchange', onSelectionChange)
+      view.removeEventListener('touchcancel', onTouchEnd)
+      if (longPressTimer) clearTimeout(longPressTimer)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
 
-  // Ctrl/⌘ + S 手动存稿
+  // Ctrl/⌘ + S 手动存稿；Delete/Backspace 删除选中图片
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isTypingField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
         flushSave(false)
+        return
+      }
+      if (!isTypingField && (e.key === 'Delete' || e.key === 'Backspace') && selectedImg) {
+        e.preventDefault()
+        deleteSelectedImg()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [flushSave])
+  }, [flushSave, selectedImg])
 
-  // 选中图片的 DOM 位置同步：当选中图片存在时，持续计算其在编辑区中的位置 → 更新手柄容器位置
+      // 选中图片的 DOM 位置同步
   useEffect(() => {
-    if (!selectedImg) {
+    if (!selectedImg || !editor) {
       setImgWrapperStyle(null)
       return
     }
     const sync = () => {
-      // 安全门：entry 所属 journal 已被删 → 停掉 interval，避免无效渲染 + 内存增长
       if (!entryStillAlive()) {
         clearInterval(t)
         window.removeEventListener('scroll', sync, true)
@@ -280,21 +333,30 @@ export default function EntryEditor({ entry, chapter }: Props) {
         setImgWrapperStyle(null)
         return
       }
-      const el = editor?.view.dom as HTMLElement | undefined
-      if (!el) return
+      const container = editorContainerRef.current
+      if (!container || !selectedImg) return
+
+      // 以 handle 的 offsetParent 作为定位参照（与 absolute 参照系一致）
+      const offsetParent = container.offsetParent as HTMLElement | null
+      const reference = offsetParent || container
+
+      const refRect = reference.getBoundingClientRect()
       const imgRect = selectedImg.getBoundingClientRect()
-      const containerRect = el.getBoundingClientRect()
+
+      // handle 容器外扩 1px，使容器 2px 边框中心对齐到图片 border-box 外缘
+      // 这样边框一半在图片外、一半覆盖在白色边框上，视觉更清晰
+      const PAD = 1
+
       setImgWrapperStyle({
         position: 'absolute',
-        left: imgRect.left - containerRect.left,
-        top: imgRect.top - containerRect.top,
-        width: imgRect.width,
-        height: imgRect.height,
-        pointerEvents: 'none',
+        left: imgRect.left - refRect.left - PAD,
+        top: imgRect.top - refRect.top - PAD,
+        width: imgRect.width + PAD * 2,
+        height: imgRect.height + PAD * 2,
       })
     }
     sync()
-    const t = setInterval(sync, 120)
+    const t = setInterval(sync, 100)
     window.addEventListener('scroll', sync, true)
     window.addEventListener('resize', sync)
     return () => {
@@ -500,6 +562,10 @@ export default function EntryEditor({ entry, chapter }: Props) {
     if (!el) return
     const onClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
+      // 如果点击的是调整手柄容器或删除按钮，不触发图片选中
+      const parent = target.closest('.img-handle-container')
+      if (parent) return
+
       if (target.tagName === 'IMG') {
         const img = target as HTMLImageElement
         // 同一图片被再次点击（已选中）→ 打开灯箱查看大图
@@ -562,8 +628,13 @@ export default function EntryEditor({ entry, chapter }: Props) {
       toast('请先选取图像')
       return
     }
-    // 确保在光标位置插入新图片，而不是替换已有图片
-    // 使用 setImage 时，如果光标不在图片上，会在光标位置插入
+    // 插入新图片前，清除所有图片选中状态
+    if (editor) {
+      const el = editor.view.dom as HTMLElement
+      el.querySelectorAll('img.img-selected').forEach((i) => i.classList.remove('img-selected'))
+    }
+    setSelectedImg(null)
+    // 在光标位置插入新图片
     editor?.chain().focus().setImage({ src: imgData, alt: imgCaption || 'illustration' }).run()
     setImgOpen(false)
     scheduleSave()
@@ -672,7 +743,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
       />
 
       {/* Tiptap 编辑器 */}
-      <div className="relative">
+      <div ref={editorContainerRef} className="relative">
         <EditorContent editor={editor} />
         <BubbleToolbar editor={editor} />
       </div>
@@ -785,40 +856,69 @@ export default function EntryEditor({ entry, chapter }: Props) {
       {/* 选中图片的调整手柄容器 */}
       {selectedImg && imgWrapperStyle && (
         <div
-          className="pointer-events-auto absolute z-10"
+          className="img-handle-container pointer-events-auto absolute z-10"
           style={{
             left: imgWrapperStyle.left,
             top: imgWrapperStyle.top,
             width: imgWrapperStyle.width,
             height: imgWrapperStyle.height,
           }}
+          onContextMenu={(e) => e.preventDefault()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
         >
-          {/* 边框 */}
-          <div className="pointer-events-none absolute inset-0 rounded border-2 border-accent/60" />
-          {/* 删除按钮 */}
-          <button
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              e.stopPropagation()
-              deleteSelectedImg()
-            }}
-            className="absolute -right-3 -top-3 flex h-7 w-7 items-center justify-center rounded-full border-2 border-red-500 bg-paper text-red-500 shadow-md hover:bg-red-500 hover:text-white transition-colors"
-            title="删除图片"
-          >
-            ✕
-          </button>
-          {/* 四角手柄 */}
+          {/* 边框 —— 实线，作为唯一选中指示 */}
+          <div className="pointer-events-none absolute inset-0 rounded border-2 border-accent" />
+          {/* 浮动对齐工具栏 —— 居中 */}
+          <div className="absolute -bottom-8 left-1/2 flex -translate-x-1/2 gap-1">
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation()
+                setFloatForSelectedImg('left')
+              }}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-margin-line bg-paper text-ink-faded hover:border-accent hover:text-accent"
+              title="左浮动"
+            >
+              ⇤
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation()
+                setFloatForSelectedImg('none')
+              }}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-margin-line bg-paper text-ink-faded hover:border-accent hover:text-accent"
+              title="居中"
+            >
+              ⇔
+            </button>
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation()
+                setFloatForSelectedImg('right')
+              }}
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-margin-line bg-paper text-ink-faded hover:border-accent hover:text-accent"
+              title="右浮动"
+            >
+              ⇥
+            </button>
+          </div>
+          {/* 四角手柄 —— 中心对齐到容器 2px 边框中线（外 1px 处） */}
           {(['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
             <div
               key={corner}
               onMouseDown={startResize(corner)}
-              className="absolute h-3 w-3 cursor-nwse-resize rounded-full border-2 border-accent bg-paper"
+              className="absolute h-3 w-3 cursor-nwse-resize rounded-full border-2 border-accent bg-paper shadow-sm"
               style={{
-                left: corner.includes('w') ? -6 : undefined,
-                right: corner.includes('e') ? -6 : undefined,
-                top: corner.includes('n') ? -6 : undefined,
-                bottom: corner.includes('s') ? -6 : undefined,
+                left: corner.includes('w') ? 1 : 'calc(100% - 1px)',
+                top: corner.includes('n') ? 1 : 'calc(100% - 1px)',
+                transform: 'translate(-50%, -50%)',
                 cursor:
                   corner === 'nw' || corner === 'se'
                     ? 'nwse-resize'
@@ -826,18 +926,16 @@ export default function EntryEditor({ entry, chapter }: Props) {
               }}
             />
           ))}
-          {/* 四边手柄（用于单方向调整） */}
+          {/* 四边手柄 —— 中心对齐到容器 2px 边框中线 */}
           {(['n', 's', 'e', 'w'] as const).map((corner) => (
             <div
               key={corner}
               onMouseDown={startResize(corner)}
-              className="absolute h-2 w-2 rounded-full border border-accent bg-paper"
+              className="absolute h-2 w-2 rounded-full border border-accent bg-paper shadow-sm"
               style={{
-                left: corner === 'w' ? -4 : corner === 'e' ? undefined : '50%',
-                right: corner === 'e' ? -4 : undefined,
-                top: corner === 'n' ? -4 : corner === 's' ? undefined : '50%',
-                bottom: corner === 's' ? -4 : undefined,
-                transform: corner === 'n' || corner === 's' ? 'translateX(-50%)' : 'translateY(-50%)',
+                left: corner === 'w' ? 1 : corner === 'e' ? 'calc(100% - 1px)' : '50%',
+                top: corner === 'n' ? 1 : corner === 's' ? 'calc(100% - 1px)' : '50%',
+                transform: 'translate(-50%, -50%)',
                 cursor: corner === 'n' || corner === 's' ? 'ns-resize' : 'ew-resize',
               }}
             />

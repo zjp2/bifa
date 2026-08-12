@@ -464,10 +464,22 @@ textarea {
   transform: rotate(0) scale(1.02);
 }
 .ink-editor img.img-selected {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: none;
   transform: rotate(0) scale(1);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(138, 47, 31, 0.22);
+}
+
+/* 图片选中时的调整手柄容器 —— 阻止系统选择、长按菜单 */
+.ink-editor .img-handle-container,
+.ink-editor .img-handle-container * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ink-editor .img-handle-container button,
+.ink-editor .img-handle-container [class*="h-3"],
+.ink-editor .img-handle-container [class*="h-2"] {
+  touch-action: manipulation;
 }
 
 /* 图片浮动：左浮 / 右浮，文字环绕 */
