@@ -78,17 +78,33 @@ export default function BookshelfPage() {
     setModalOpen(true)
   }
 
-  // 选取图片 → 转 base64
+  // 选取图片 → Canvas 压缩 → 转 base64（限制最大 800px，JPEG 质量 0.8）
   const onPickCover = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 3 * 1024 * 1024) {
-      toast('图片不宜超过 3MB')
+    if (file.size > 5 * 1024 * 1024) {
+      toast('图片不宜超过 5MB')
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => setCoverImage(reader.result as string)
-    reader.readAsDataURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const MAX = 800
+      let { width, height } = img
+      if (width > MAX || height > MAX) {
+        const ratio = Math.min(MAX / width, MAX / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+      setCoverImage(dataUrl)
+    }
+    img.onerror = () => toast('图片加载失败')
+    img.src = URL.createObjectURL(file)
     e.target.value = ''
   }
 
@@ -97,10 +113,14 @@ export default function BookshelfPage() {
       toast('请为日记本命名')
       return
     }
-    const j = await createJournal({ name: name.trim(), description: desc.trim(), color, coverImage })
-    setModalOpen(false)
-    toast(`已立卷《${j.name}》`)
-    navigate(`/journal/${j.id}`)
+    try {
+      const j = await createJournal({ name: name.trim(), description: desc.trim(), color, coverImage })
+      setModalOpen(false)
+      toast(`已立卷《${j.name}》`)
+      navigate(`/journal/${j.id}`)
+    } catch (e: any) {
+      toast('创建失败：' + (e?.response?.data?.message || e.message || '未知错误'))
+    }
   }
 
   const onDelete = async (b: Journal, e: React.MouseEvent) => {
