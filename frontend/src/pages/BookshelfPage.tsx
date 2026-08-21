@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useJournalStore } from '@/store/journalStore'
@@ -8,6 +8,7 @@ import ProfileModal from '@/components/ProfileModal'
 import BookCover from '@/components/BookCover'
 import OpeningBookOverlay from '@/components/OpeningBookOverlay'
 import InspirationModal from '@/components/InspirationModal'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import { BOOK_COLORS, type Journal } from '@/types'
 import { initialsOf } from '@/utils'
 import { getDailyQuote } from '@/data/quotes'
@@ -67,9 +68,6 @@ export default function BookshelfPage() {
     return { totalEntries, totalWords, lastWriteDate, recent, streakDays }
   }, [journals])
 
-  // 进入时确保数据已加载
-  useEffect(() => {}, [])
-
   const openModal = () => {
     setName('')
     setDesc('')
@@ -123,12 +121,20 @@ export default function BookshelfPage() {
     }
   }
 
-  const onDelete = async (b: Journal, e: React.MouseEvent) => {
+  const [deleteTarget, setDeleteTarget] = useState<Journal | null>(null)
+
+  const onDelete = (b: Journal, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm(`确定撕去《${b.name}》全卷？`)) {
-      await deleteJournal(b.id)
-      toast('已撕去此卷')
-    }
+    setDeleteTarget(b)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    const name = deleteTarget.name
+    const id = deleteTarget.id
+    setDeleteTarget(null)
+    await deleteJournal(id)
+    toast(`已撕去《${name}》全卷`)
   }
 
   const onOpen = (b: Journal, e: React.MouseEvent) => {
@@ -449,13 +455,30 @@ export default function BookshelfPage() {
       {/* 个人信息弹层 */}
       <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
-      {/* 灵感阁弹层 */}
-      <InspirationModal open={inspirationOpen} onClose={() => setInspirationOpen(false)} />
+      {/* 灵感阁弹层：默认收录到第一个日记本的第一章 */}
+      <InspirationModal
+        open={inspirationOpen}
+        onClose={() => setInspirationOpen(false)}
+        targetJournalId={journals[0]?.id}
+        targetChapterId={journals[0]?.chapters?.[0]?.id}
+      />
 
       {/* 书翻开浮层 */}
       {openingBook && (
         <OpeningBookOverlay journal={openingBook.journal} startRect={openingBook.rect} />
       )}
+
+      {/* 删除确认对话框 */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="撕去此卷"
+        message={deleteTarget ? `确定撕去《${deleteTarget.name}》全卷？此操作不可恢复。` : ''}
+        confirmText="撕去"
+        cancelText="留着"
+        danger
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

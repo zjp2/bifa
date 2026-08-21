@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
 import { TextStyle } from '@tiptap/extension-text-style'
 
@@ -45,8 +44,9 @@ export default function EntryEditor({ entry, chapter }: Props) {
   const [date, setDate] = useState<number>(
     typeof entry.date === 'string' ? new Date(entry.date).getTime() : entry.date,
   )
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [tags, _setTags] = useState<string[]>(entry.tags ?? [])
+  const [tags, setTags] = useState<string[]>(entry.tags ?? [])
+  const [tagInputOpen, setTagInputOpen] = useState(false)
+  const [newTag, setNewTag] = useState('')
 
   // 图片 / 代码弹层
   const [imgOpen, setImgOpen] = useState(false)
@@ -100,7 +100,6 @@ export default function EntryEditor({ entry, chapter }: Props) {
         code: { HTMLAttributes: { class: 'inline-code' } },
         heading: { levels: [3] },
       }),
-      Underline,
       Highlight.configure({ multicolor: false }),
       TextStyle,
       InkImage.configure({ inline: false, allowBase64: true }),
@@ -310,32 +309,36 @@ export default function EntryEditor({ entry, chapter }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [flushSave, selectedImg])
 
-      // 选中图片的 DOM 位置同步
+      // 选中图片的 DOM 位置同步（使用 ResizeObserver + rAF 节流，替代 100ms 轮询）
   useEffect(() => {
     if (!selectedImg || !editor) {
       setImgWrapperStyle(null)
       return
     }
-    const sync = () => {
+
+    let rafId = 0
+    const scheduleSync = () => {
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = 0
+        doSync()
+      })
+    }
+
+    const doSync = () => {
       if (!entryStillAlive()) {
-        clearInterval(t)
-        window.removeEventListener('scroll', sync, true)
-        window.removeEventListener('resize', sync)
+        cleanup()
         setImgWrapperStyle(null)
         return
       }
       const container = editorContainerRef.current
       if (!container || !selectedImg) return
 
-      // 以 handle 的 offsetParent 作为定位参照（与 absolute 参照系一致）
       const offsetParent = container.offsetParent as HTMLElement | null
       const reference = offsetParent || container
 
       const refRect = reference.getBoundingClientRect()
       const imgRect = selectedImg.getBoundingClientRect()
-
-      // handle 容器外扩 1px，使容器 2px 边框中心对齐到图片 border-box 外缘
-      // 这样边框一半在图片外、一半覆盖在白色边框上，视觉更清晰
       const PAD = 1
 
       setImgWrapperStyle({
@@ -346,15 +349,39 @@ export default function EntryEditor({ entry, chapter }: Props) {
         height: imgRect.height + PAD * 2,
       })
     }
-    sync()
-    const t = setInterval(sync, 100)
-    window.addEventListener('scroll', sync, true)
-    window.addEventListener('resize', sync)
-    return () => {
-      clearInterval(t)
-      window.removeEventListener('scroll', sync, true)
-      window.removeEventListener('resize', sync)
+
+    // 监听容器和图片的尺寸变化
+    const container = editorContainerRef.current
+    const observers: ResizeObserver[] = []
+    if (container) {
+      const containerRO = new ResizeObserver(scheduleSync)
+      containerRO.observe(container)
+      observers.push(containerRO)
     }
+    if (selectedImg) {
+      const imgRO = new ResizeObserver(scheduleSync)
+      imgRO.observe(selectedImg)
+      observers.push(imgRO)
+    }
+
+    // 滚动/尺寸变化时节流同步
+    window.addEventListener('scroll', scheduleSync, true)
+    window.addEventListener('resize', scheduleSync)
+
+    // 首次同步
+    doSync()
+
+    const cleanup = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId)
+        rafId = 0
+      }
+      observers.forEach((ro) => ro.disconnect())
+      window.removeEventListener('scroll', scheduleSync, true)
+      window.removeEventListener('resize', scheduleSync)
+    }
+
+    return cleanup
   }, [selectedImg, editor, entryStillAlive])
 
   // 选中图片时在 Tiptap 中定位对应节点（以便 setImageWidth 更新）
@@ -730,8 +757,82 @@ export default function EntryEditor({ entry, chapter }: Props) {
           scheduleSave()
         }}
         placeholder="a quiet subtitle"
-        className="mb-5 w-full border-none bg-transparent text-center font-latin text-base italic text-ink-faded outline-none"
+        className="mb-3 w-full border-none bg-transparent text-center font-latin text-base italic text-ink-faded outline-none"
       />
+
+      {/* 标签 */}
+      {(tags.length > 0 || tagInputOpen) && (
+        <div className="mb-5 flex flex-wrap items-center justify-center gap-1.5">
+          {tags.map((tag, i) => (
+            <span
+              key={tag}
+              className="group/tag inline-flex items-center gap-1 rounded-full border border-ink-line/50 bg-paper-soft px-2.5 py-0.5 text-xs text-ink-muted transition hover:border-ink-accent/60 hover:text-ink-accent"
+            >
+              #{tag}
+              <button
+                onClick={() => {
+                  const next = tags.filter((_, idx) => idx !== i)
+                  setTags(next)
+                  scheduleSave()
+                }}
+                className="text-ink-faded opacity-0 transition group-hover/tag:opacity-100 hover:text-ink-danger"
+                aria-label={`删除标签 ${tag}`}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {tagInputOpen ? (
+            <input
+              autoFocus
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ',') {
+                  e.preventDefault()
+                  const v = newTag.trim()
+                  if (v && !tags.includes(v)) {
+                    setTags([...tags, v])
+                    scheduleSave()
+                  }
+                  setNewTag('')
+                  setTagInputOpen(false)
+                } else if (e.key === 'Escape') {
+                  setNewTag('')
+                  setTagInputOpen(false)
+                }
+              }}
+              onBlur={() => {
+                const v = newTag.trim()
+                if (v && !tags.includes(v)) {
+                  setTags([...tags, v])
+                  scheduleSave()
+                }
+                setNewTag('')
+                setTagInputOpen(false)
+              }}
+              placeholder="输入标签后回车"
+              className="w-28 border-none bg-transparent px-1 text-center text-xs text-ink outline-none"
+            />
+          ) : null}
+          {!tagInputOpen && (
+            <button
+              onClick={() => setTagInputOpen(true)}
+              className="rounded-full border border-dashed border-ink-line/60 px-2 py-0.5 text-xs text-ink-faded transition hover:border-ink-accent hover:text-ink-accent"
+            >
+              + 标签
+            </button>
+          )}
+        </div>
+      )}
+      {tags.length === 0 && !tagInputOpen && (
+        <button
+          onClick={() => setTagInputOpen(true)}
+          className="mb-5 w-full text-center text-xs text-ink-faded/70 transition hover:text-ink-accent"
+        >
+          + 添加标签
+        </button>
+      )}
 
       {/* Tiptap 编辑器 */}
       <div ref={editorContainerRef} className="relative">

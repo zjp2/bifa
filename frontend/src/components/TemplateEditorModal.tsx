@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Modal from './Modal'
+import ConfirmDialog from './ConfirmDialog'
 import {
   type StoryTemplates,
   TEMPLATE_CATEGORIES,
@@ -19,6 +20,7 @@ export default function TemplateEditorModal({ open, onClose }: Props) {
   const [activeCategory, setActiveCategory] = useState<keyof StoryTemplates>('opening')
   const [newItem, setNewItem] = useState('')
   const [toastMsg, setToastMsg] = useState('')
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
 
   const showToast = (msg: string) => {
     setToastMsg(msg)
@@ -54,9 +56,9 @@ export default function TemplateEditorModal({ open, onClose }: Props) {
   }
 
   const handleClearAll = () => {
-    if (!confirm('确定清空所有自定义素材？')) return
     setUserTemplates({})
     saveUserTemplates({})
+    setClearConfirmOpen(false)
     showToast('已清空')
   }
 
@@ -64,6 +66,7 @@ export default function TemplateEditorModal({ open, onClose }: Props) {
   const categoryMeta = TEMPLATE_CATEGORIES.find((c) => c.key === activeCategory)!
 
   return (
+    <>
     <Modal
       open={open}
       onClose={onClose}
@@ -150,7 +153,7 @@ export default function TemplateEditorModal({ open, onClose }: Props) {
           {user.length > 0 && (
             <button
               type="button"
-              onClick={handleClearAll}
+              onClick={() => setClearConfirmOpen(true)}
               className="font-latin text-[10px] italic text-ink-faded underline-offset-2 hover:text-accent hover:underline"
             >
               清空全部
@@ -199,5 +202,18 @@ export default function TemplateEditorModal({ open, onClose }: Props) {
         自定义素材保存在本地浏览器 · 与内置素材合并使用
       </div>
     </Modal>
+
+    {/* 清空确认对话框 */}
+    <ConfirmDialog
+      open={clearConfirmOpen}
+      title="清空素材"
+      message="确定清空所有自定义素材？此操作不可恢复。"
+      confirmText="清空"
+      cancelText="取消"
+      danger
+      onConfirm={handleClearAll}
+      onCancel={() => setClearConfirmOpen(false)}
+    />
+    </>
   )
 }

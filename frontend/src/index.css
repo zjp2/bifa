@@ -460,6 +460,35 @@ textarea {
   user-select: none;
   -webkit-user-drag: none;
 }
+
+/* 图片加载失败时的容错：显示占位提示 */
+.ink-editor img::before {
+  content: '🖼 图片加载失败';
+  display: block;
+  width: 280px;
+  max-width: 100%;
+  padding: 2em 1em;
+  margin: 1.5em auto;
+  border: 2px dashed rgba(156, 126, 67, 0.4);
+  border-radius: 8px;
+  background: rgba(243, 234, 215, 0.3);
+  color: #999;
+  text-align: center;
+  font-size: 14px;
+  font-family: system-ui, sans-serif;
+  transform: none;
+  cursor: default;
+  box-shadow: none;
+}
+.ink-editor img::after {
+  content: attr(src);
+  display: block;
+  margin-top: 4px;
+  text-align: center;
+  font-size: 10px;
+  color: #aaa;
+  word-break: break-all;
+}
 .ink-editor img:hover {
   transform: rotate(0) scale(1.02);
 }

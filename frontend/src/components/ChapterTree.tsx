@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useJournalStore } from '@/store/journalStore'
 import { useUIStore } from '@/store/uiStore'
 import Modal from '@/components/Modal'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import type { Chapter, Journal } from '@/types'
 
 interface Props {
@@ -29,6 +30,11 @@ export default function ChapterTree({ journal, onNavigate }: Props) {
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null)
   const [renameVal, setRenameVal] = useState('')
+  const [confirmState, setConfirmState] = useState<
+    | { type: 'chapter'; id: string; name: string; entryCount: number }
+    | { type: 'entry'; id: string }
+    | null
+  >(null)
 
   const openNewChapter = () => {
     setChapterName('')
@@ -62,12 +68,9 @@ export default function ChapterTree({ journal, onNavigate }: Props) {
     toast('已更名')
   }
 
-  const onDeleteChapter = async (c: Chapter, e: React.MouseEvent) => {
+  const onDeleteChapter = (c: Chapter, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm(`删除章节"${c.name}"及 ${c.entries.length} 则？`)) {
-      await deleteChapter(c.id)
-      toast('已删除章节')
-    }
+    setConfirmState({ type: 'chapter', id: c.id, name: c.name, entryCount: c.entries.length })
   }
 
   const onAddEntry = async (c: Chapter, e: React.MouseEvent) => {
@@ -85,9 +88,21 @@ export default function ChapterTree({ journal, onNavigate }: Props) {
     onNavigate?.()
   }
 
-  const onDeleteEntry = async (id: string, e: React.MouseEvent) => {
+  const onDeleteEntry = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (confirm('撕去此页？')) {
+    setConfirmState({ type: 'entry', id })
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!confirmState) return
+    if (confirmState.type === 'chapter') {
+      const { id, name } = confirmState
+      setConfirmState(null)
+      await deleteChapter(id)
+      toast(`已删除章节"${name}"`)
+    } else {
+      const { id } = confirmState
+      setConfirmState(null)
       await deleteEntry(id)
       if (entryId === id) navigate(`/journal/${journal.id}`)
       toast('已撕去此页')
@@ -312,6 +327,24 @@ export default function ChapterTree({ journal, onNavigate }: Props) {
           </button>
         </div>
       </Modal>
+
+      {/* 删除确认对话框 */}
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.type === 'chapter' ? '删除章节' : '撕去此页'}
+        message={
+          confirmState?.type === 'chapter'
+            ? `删除章节"${confirmState.name}"及 ${confirmState.entryCount} 则？此操作不可恢复。`
+            : confirmState
+              ? '撕去此页？此操作不可恢复。'
+              : ''
+        }
+        confirmText="删除"
+        cancelText="取消"
+        danger
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   )
 }
