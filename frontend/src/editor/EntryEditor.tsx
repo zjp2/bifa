@@ -139,6 +139,11 @@ export default function EntryEditor({ entry, chapter }: Props) {
     editorRect: DOMRect
   } | null>(null)
 
+  // 选中框同步入口（由下方同步 effect 写入）：拖拽缩放与 ResizeObserver 共用
+  // 同一个 rAF 节流通道，确保选中框位置/尺寸只来自"图片当前真实 rect"
+  // 这一个数据源 —— 两处状态各写各的会每帧交替打架，造成边框闪烁
+  const syncOverlayRef = useRef<() => void>(() => {})
+
   const dateInfo = useMemo(() => fmtDate(date), [date])
 
   // 自动保存：脏标记 + 800ms 防抖
@@ -430,6 +435,8 @@ export default function EntryEditor({ entry, chapter }: Props) {
         doSync()
       })
     }
+    // 暴露给拖拽逻辑复用：走同一个 rAF 节流，与 ResizeObserver 天然去重
+    syncOverlayRef.current = scheduleSync
 
     const doSync = () => {
       if (!entryStillAlive()) {
@@ -487,7 +494,11 @@ export default function EntryEditor({ entry, chapter }: Props) {
       window.removeEventListener('resize', scheduleSync)
     }
 
-    return cleanup
+    // 卸载时置空，避免拖拽逻辑调用到已失效的闭包
+    return () => {
+      syncOverlayRef.current = () => {}
+      cleanup()
+    }
   }, [selectedImg, editor, entryStillAlive])
 
   // 选中图片时在 Tiptap 中定位对应节点（以便 setImageWidth 更新）
@@ -592,18 +603,22 @@ export default function EntryEditor({ entry, chapter }: Props) {
           newH = shift ? newW / ratio : d.startH
           break
         case 's':
+          // 垂直手柄同样按比例换算成宽度（图片高度始终由宽度等比决定）
           newH = Math.max(60, d.startH + dy)
-          newW = shift ? newH * ratio : d.startW
+          newW = newH * ratio
           break
         case 'n':
           newH = Math.max(60, d.startH - dy)
-          newW = shift ? newH * ratio : d.startW
+          newW = newH * ratio
           break
       }
       // 实时修改 DOM 宽度（先不写入文档，mouseup 再 commit）
       d.img.style.width = `${Math.round(newW)}px`
       d.img.style.height = shift ? `${Math.round(newH)}px` : ''
-      setImgWrapperStyle((s) => (s ? { ...s, width: Math.round(newW), height: Math.round(newH) } : s))
+      // 选中框不做直写：图片水平居中（margin:auto），宽度变化时 left 也会变，
+      // 且非等比拖拽时 newH ≠ 图片真实高度；统一走 rect 同步通道（rAF 内、
+      // 与 ResizeObserver 同源去重），单一数据源，消除边框每帧来回抖动/闪烁
+      syncOverlayRef.current()
     }
     const onUp = () => {
       const d = resizeDragRef.current
