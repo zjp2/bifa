@@ -24,6 +24,60 @@ function escapeCodeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+/** 插图压缩上限：最长边 / 输出质量 */
+const IMG_MAX_EDGE = 1600
+const IMG_JPEG_QUALITY = 0.85
+
+/**
+ * 压缩插图：base64 图片直接内嵌进 content 并随自动保存全量提交，
+ * 原图动辄数 MB，会让每次存稿都重传一遍 → 网络面板"一直在请求"。
+ * 这里限制最长边并重新编码（无透明通道输出 JPEG，含透明输出 PNG），
+ * 小图（≤ 300KB 且尺寸未超限）保持原样，避免无谓的有损压缩。
+ */
+function compressImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const { naturalWidth: w, naturalHeight: h } = img
+      const needScale = w > IMG_MAX_EDGE || h > IMG_MAX_EDGE
+      // 小且尺寸合规的图无需处理
+      if (!needScale && dataUrl.length <= 300 * 1024) {
+        resolve(dataUrl)
+        return
+      }
+      const ratio = needScale ? Math.min(IMG_MAX_EDGE / w, IMG_MAX_EDGE / h) : 1
+      const width = Math.max(1, Math.round(w * ratio))
+      const height = Math.max(1, Math.round(h * ratio))
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) throw new Error('no 2d context')
+        ctx.drawImage(img, 0, 0, width, height)
+        // 检测透明通道：任一像素 alpha < 255 视为含透明，保留 PNG
+        const data = ctx.getImageData(0, 0, width, height).data
+        let hasAlpha = false
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] < 255) {
+            hasAlpha = true
+            break
+          }
+        }
+        const out = hasAlpha
+          ? canvas.toDataURL('image/png')
+          : canvas.toDataURL('image/jpeg', IMG_JPEG_QUALITY)
+        resolve(out)
+      } catch {
+        // 压缩失败（如 canvas 被安全策略限制）：退回原图
+        resolve(dataUrl)
+      }
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
+  })
+}
+
 export default function EntryEditor({ entry, chapter }: Props) {
   const toast = useUIStore((s) => s.toast)
   const updateEntry = useJournalStore((s) => s.updateEntry)
@@ -92,6 +146,13 @@ export default function EntryEditor({ entry, chapter }: Props) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // 用 ref 持有最新的 scheduleSave，供 onUpdate 调用，避免闭包时序问题
   const scheduleRef = useRef<(delay?: number) => void>(() => {})
+  // 保存中标记 + 待补存标记：避免大 content（含 base64 插图）请求堆积/乱序覆盖
+  const savingRef = useRef(false)
+  const pendingSaveRef = useRef(false)
+  // 最近一次成功提交的 payload，内容未变时跳过重复请求
+  const lastSavedRef = useRef<string | null>(null)
+  // 用 ref 持有最新的 flushSave，供请求完成后的补存调用
+  const flushRef = useRef<(silent?: boolean) => void>(() => {})
 
   const editor = useEditor({
     extensions: [
@@ -144,18 +205,50 @@ export default function EntryEditor({ entry, chapter }: Props) {
         saveTimerRef.current = undefined
       }
       const f = fieldsRef.current
+      const content = editorRef.current?.getHTML() ?? entry.content
+      // 内容与上次成功提交一致 → 无需再发请求
+      const payload = JSON.stringify([f.title, f.subtitle, f.date, f.tags, content])
+      if (payload === lastSavedRef.current) {
+        dirtyRef.current = false
+        if (!silent) toast('已是最新')
+        return
+      }
+      // 上一个请求还在飞行中：挂起，等它完成后再补存（拿最新内容），
+      // 避免大 content 请求并发堆积、以及响应乱序导致旧数据覆盖新数据
+      if (savingRef.current) {
+        pendingSaveRef.current = true
+        return
+      }
+      savingRef.current = true
+      dirtyRef.current = false
       void updateEntry(entry.id, {
         title: f.title,
         subtitle: f.subtitle,
         date: f.date,
         tags: f.tags,
-        content: editorRef.current?.getHTML() ?? entry.content,
+        content,
       })
-      dirtyRef.current = false
+        .then(() => {
+          lastSavedRef.current = payload
+        })
+        .finally(() => {
+          savingRef.current = false
+          if (pendingSaveRef.current) {
+            pendingSaveRef.current = false
+            // 保存期间又有改动 → 立即补存一次最新内容
+            dirtyRef.current = true
+            flushRef.current(true)
+          }
+        })
       if (!silent) toast('已存稿')
     },
     [entry.id, entry.content, updateEntry, toast, entryStillAlive],
   )
+
+  // 让补存逻辑始终能调到最新的 flushSave
+  useEffect(() => {
+    flushRef.current = flushSave
+  }, [flushSave])
 
   const scheduleSave = useCallback(
     (delay = 800) => {
@@ -178,7 +271,9 @@ export default function EntryEditor({ entry, chapter }: Props) {
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      if (dirtyRef.current) {
+      // 补存标记也要落盘：保存飞行中又有改动时，dirty 可能尚未重新置位
+      if (dirtyRef.current || pendingSaveRef.current) {
+        pendingSaveRef.current = false
         // 卸载前做一次 alive 检查：如果 entry 已不在 store（所属 journal/chapter 已被删），直接跳过
         const latest = useJournalStore.getState().journals
         let alive = false
@@ -286,6 +381,17 @@ export default function EntryEditor({ entry, chapter }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
 
+  // 删除选中的图片
+  const deleteSelectedImg = useCallback(() => {
+    if (!selectedImg || !editor) return
+    const pos = editor.view.posAtDOM(selectedImg, 0)
+    if (pos == null) return
+    editor.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run()
+    setSelectedImg(null)
+    scheduleSave()
+    toast('已删除图像')
+  }, [selectedImg, editor, scheduleSave, toast])
+
   // Ctrl/⌘ + S 手动存稿；Delete/Backspace 删除选中图片
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -307,7 +413,7 @@ export default function EntryEditor({ entry, chapter }: Props) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [flushSave, selectedImg])
+  }, [flushSave, selectedImg, deleteSelectedImg])
 
       // 选中图片的 DOM 位置同步（使用 ResizeObserver + rAF 节流，替代 100ms 轮询）
   useEffect(() => {
@@ -633,12 +739,22 @@ export default function EntryEditor({ entry, chapter }: Props) {
   const onImgFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
-    if (f.size > 4 * 1024 * 1024) {
-      toast('请选小于 4MB 的图像')
+    // 入口放宽到 8MB（覆盖常见手机直拍照片），真正约束的是压缩后的体积
+    if (f.size > 8 * 1024 * 1024) {
+      toast('请选小于 8MB 的图像')
       return
     }
     const r = new FileReader()
-    r.onload = (ev) => setImgData(ev.target?.result as string)
+    r.onload = async (ev) => {
+      const raw = ev.target?.result as string
+      // 压缩后再嵌入，避免大图 base64 拖垮后续每次自动保存
+      const compressed = await compressImage(raw)
+      if (compressed.length > 4 * 1024 * 1024) {
+        toast('该图像压缩后仍然过大，请换一张')
+        return
+      }
+      setImgData(compressed)
+    }
     r.readAsDataURL(f)
   }
   const confirmImg = () => {
@@ -657,17 +773,6 @@ export default function EntryEditor({ entry, chapter }: Props) {
     setImgOpen(false)
     scheduleSave()
     toast('已嵌入图像')
-  }
-
-  // 删除选中的图片
-  const deleteSelectedImg = () => {
-    if (!selectedImg || !editor) return
-    const pos = editor.view.posAtDOM(selectedImg, 0)
-    if (pos == null) return
-    editor.chain().focus().deleteRange({ from: pos, to: pos + 1 }).run()
-    setSelectedImg(null)
-    scheduleSave()
-    toast('已删除图像')
   }
 
   /* ---------- 代码 ---------- */
