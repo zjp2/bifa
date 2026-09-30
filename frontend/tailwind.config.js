@@ -19,10 +19,10 @@ export default {
         'shelf-deep': 'var(--shelf-deep)',
       },
       fontFamily: {
-        serif: ['Spectral', 'Noto Serif SC', 'Georgia', 'serif'],
-        cn: ['Noto Serif SC', 'serif'],
+        serif: ['Spectral', 'Noto Serif SC', 'Ink Symbols', 'Georgia', 'serif'],
+        cn: ['Noto Serif SC', 'Ink Symbols', 'serif'],
         brush: ['"Ma Shan Zheng"', 'serif'],
-        latin: ['"Cormorant Garamond"', 'serif'],
+        latin: ['"Cormorant Garamond"', 'Ink Symbols', 'serif'],
         hand: ['Caveat', 'cursive'],
         mono: ['"JetBrains Mono"', '"Fira Code"', 'Consolas', 'monospace'],
       },

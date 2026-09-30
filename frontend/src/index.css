@@ -3,6 +3,31 @@
 @tailwind utilities;
 
 /* ===========================================
+   自托管装饰符号字体（子集，共 ~3.5KB）
+   图标均为 Unicode 符号（❦ ✦ ✕ ✎ ⇤ ⇥ …），正文字体（Spectral/Cormorant/
+   Noto Serif SC）并不包含这些字形，全靠系统字体兜底；当 Google Fonts
+   不可达且系统缺字形时（如 Windows + 大陆网络）会渲染成"豆腐块"。
+   这里从应用自身域名加载符号子集，彻底消除外部依赖。
+   core: Noto Sans Symbols 2 子集（OFL）；arrows: DejaVu Sans 子集（公有领域）
+   =========================================== */
+@font-face {
+  font-family: 'Ink Symbols';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/ink-symbols-core.woff2') format('woff2');
+  unicode-range: U+2318, U+25BE, U+270E, U+2715, U+2726, U+2766, U+1F5BC;
+}
+@font-face {
+  font-family: 'Ink Symbols';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/ink-symbols-arrows.woff2') format('woff2');
+  unicode-range: U+2190, U+2192, U+21D4, U+21E4-21E5, U+2460-2464;
+}
+
+/* ===========================================
    墨笺 · Inkwell Journal — 全局样式
    古籍手札美学：宣纸纹理、木纹书架、装饰符号、暗角光晕
    =========================================== */
@@ -37,7 +62,7 @@ body,
 }
 
 body {
-  font-family: 'Spectral', 'Noto Serif SC', Georgia, serif;
+  font-family: 'Spectral', 'Noto Serif SC', 'Ink Symbols', Georgia, serif;
   color: var(--ink);
   background: var(--paper);
   overflow: hidden;
@@ -101,7 +126,7 @@ textarea {
 @layer components {
   /* 装饰性符号 */
   .ornament {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Cormorant Garamond', 'Ink Symbols', serif;
     color: var(--accent);
   }
 
@@ -343,7 +368,7 @@ textarea {
    =========================================== */
 .ink-editor.ProseMirror {
   min-height: 400px;
-  font-family: 'Spectral', 'Noto Serif SC', serif;
+  font-family: 'Spectral', 'Noto Serif SC', 'Ink Symbols', serif;
   font-size: 17px;
   line-height: 2;
   color: var(--ink);
